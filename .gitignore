@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# Xcode build output
+build/
+DerivedData/
+*.xcarchive
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+
+# Generated Xcode project (XcodeGen, from project.yml)
+GrammarBuddy.xcodeproj/
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# Release artifacts
+releases/
+*.dmg
+*.zip
+
+# Signing keys: never commit private keys
+*.private
+*.pem
+.env
