@@ -53,6 +53,7 @@ It does not draw underlines in other apps as you type. It checks text when you a
 | | |
 |---|---|
 | [`docs/DESIGN.md`](docs/DESIGN.md) | The design (Chinese) |
+| [`docs/DEVLOG.md`](docs/DEVLOG.md) | What has been done, results, pitfalls and next steps (Chinese) |
 | [`docs/INVESTIGATION.md`](docs/INVESTIGATION.md) | Feasibility tests done before the design |
 | [`docs/MODELS.md`](docs/MODELS.md) | Local models tested on six languages |
 | [`docs/review/`](docs/review/) | Four rounds of simulated-user review and how each issue was handled |
