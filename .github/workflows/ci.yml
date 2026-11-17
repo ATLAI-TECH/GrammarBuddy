@@ -5,9 +5,15 @@ on:
   pull_request:
 jobs:
   build:
-    runs-on: macos-15
+    # The built-in model's packages need Swift tools 6.3 (mlx-swift), so the runner must have Xcode 26.4 or newer.
+    # macos-15 only has Xcode 16: package resolution failed there (xcodebuild exit code 74).
+    runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
       - name: Kit unit tests
         run: cd GrammarBuddyKit && swift test
       - name: Install XcodeGen
@@ -15,5 +21,7 @@ jobs:
       - name: Build the app (unsigned)
         run: |
           xcodegen generate
+          set -o pipefail
           xcodebuild -project GrammarBuddy.xcodeproj -scheme GrammarBuddy -configuration Debug \
-            -derivedDataPath build/dd CODE_SIGNING_ALLOWED=NO build
+            -derivedDataPath build/dd -skipMacroValidation -skipPackagePluginValidation \
+            CODE_SIGNING_ALLOWED=NO build | grep -E "^\*\* |: error:|error: |warning: unable|Resolve Package|Resolved source" 
