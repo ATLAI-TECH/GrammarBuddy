@@ -69,9 +69,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func updateIcon() {
-        let name = state.hotkeyProblem != nil ? "exclamationmark.bubble"
-            : (state.hotkeysPaused ? "pause.circle" : (LiveChecker.shared.isBusy ? "ellipsis.bubble" : "text.bubble"))
-        statusItem.button?.image = NSImage(systemSymbolName: name, accessibilityDescription: "GrammarBuddy")
+        // Our own glyphs (logo/make_icons.py → Assets.xcassets, template images): the G with the capybara, the same
+        // crossed out while paused, and with a dot while a check is running. A shortcut problem keeps the system
+        // warning bubble, which reads as "something is wrong" better than any of the three.
+        if state.hotkeyProblem != nil {
+            statusItem.button?.image = NSImage(systemSymbolName: "exclamationmark.bubble", accessibilityDescription: "GrammarBuddy")
+        } else {
+            let name = state.hotkeysPaused ? "MenuBarPaused" : (LiveChecker.shared.isBusy ? "MenuBarDot" : "MenuBarNormal")
+            let image = NSImage(named: name) ?? NSImage(systemSymbolName: "text.bubble", accessibilityDescription: "GrammarBuddy")
+            image?.isTemplate = true
+            image?.accessibilityDescription = "GrammarBuddy"
+            statusItem.button?.image = image
+        }
         statusItem.button?.toolTip = state.hotkeyProblem ?? "GrammarBuddy"
     }
 
