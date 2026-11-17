@@ -8,29 +8,65 @@ Original:
 
 > Die Ergebnisse des Experiment zeigt, das die Temperatur einen großen Einfluss auf der Blütezeit hat.
 
-**google/gemma-4-e4b** (14.27 s, thinking 2277 chars, changed 27% of 15 words):
+**qwen/qwen3-14b** #0 (1.59 s):
+
+> Die Ergebnisse des Experimentes zeigen, dass die Temperatur einen großen Einfluss auf die Blütezeit hat.
+
+**qwen/qwen3-14b** #1 (1.2 s):
+
+> Die Ergebnisse des Experimentes zeigen, dass die Temperatur einen großen Einfluss auf die Blütezeit hat.
+
+**qwen/qwen3-14b** #2 (0.98 s):
+
+> Die Ergebnisse des Experimentes zeigen, dass die Temperatur einen großen Einfluss auf die Blütezeit hat.
+
+**qwen/qwen3-4b-2507** #0 (0.38 s):
 
 > Die Ergebnisse des Experiments zeigen, dass die Temperatur einen großen Einfluss auf die Blütezeit hat.
 
-**google/gemma-4-12b-qat** (18.13 s, thinking 1886 chars, changed 27% of 15 words):
+**qwen/qwen3-4b-2507** #1 (0.27 s):
+
+> Die Ergebnisse des Experiments zeigen, dass die Temperatur einen großen Einfluss auf die Blütezeit hat.
+
+**qwen/qwen3-4b-2507** #2 (0.27 s):
 
 > Die Ergebnisse des Experiments zeigen, dass die Temperatur einen großen Einfluss auf die Blütezeit hat.
 
 ## de-fix-2 · fix
 
-Note: dass + Verbendstellung, Änderungen groß, Kommas, 'ihn' (der Bericht)
+Note: dass + Verbendstellung, Änderungen groß, Kommas, 'ihn' (der Bericht); de-r4-12: 这条已经在语料里。建议把期望结果写成完整的句子，并把「„müssen“ 必须还在」列为硬性考点。只写考点关键词的话，e4b 这次的输出会被算作大部分通过。
 
 Original:
 
 > Ich habe gestern den Bericht gelesen und denke das wir müssen noch einige änderungen machen bevor wir es einreichen.
 
-**google/gemma-4-e4b** (10.79 s, thinking 1641 chars, changed 26% of 19 words):
+Expected:
 
-> Ich habe gestern den Bericht gelesen und denke, dass wir noch einige Änderungen machen, bevor wir es einreichen.
+> Ich habe gestern den Bericht gelesen und denke, dass wir noch einige Änderungen machen müssen, bevor wir ihn einreichen.
 
-**google/gemma-4-12b-qat** (31.61 s, thinking 4068 chars, finish=length, changed 100% of 19 words):
+**qwen/qwen3-14b** #0 (1.05 s, = expected):
 
-> 
+> Ich habe gestern den Bericht gelesen und denke, dass wir noch einige Änderungen machen müssen, bevor wir ihn einreichen.
+
+**qwen/qwen3-14b** #1 (1.13 s, = expected):
+
+> Ich habe gestern den Bericht gelesen und denke, dass wir noch einige Änderungen machen müssen, bevor wir ihn einreichen.
+
+**qwen/qwen3-14b** #2 (1.08 s, = expected):
+
+> Ich habe gestern den Bericht gelesen und denke, dass wir noch einige Änderungen machen müssen, bevor wir ihn einreichen.
+
+**qwen/qwen3-4b-2507** #0 (0.36 s):
+
+> Ich habe gestern den Bericht gelesen und denke, dass wir noch einige Änderungen machen müssen, bevor wir es einreichen.
+
+**qwen/qwen3-4b-2507** #1 (0.32 s):
+
+> Ich habe gestern den Bericht gelesen und denke, dass wir noch einige Änderungen machen müssen, bevor wir es einreichen.
+
+**qwen/qwen3-4b-2507** #2 (0.32 s):
+
+> Ich habe gestern den Bericht gelesen und denke, dass wir noch einige Änderungen machen müssen, bevor wir es einreichen.
 
 ## de-fix-3 · fix
 
@@ -40,13 +76,29 @@ Original:
 
 > Wegen dem schlechten Wetter haben wir uns entschieden zuhause zu bleiben, obwohl wir hatten Karten für das Konzert.
 
-**google/gemma-4-e4b** (17.85 s, thinking 2962 chars, changed 28% of 18 words):
+**qwen/qwen3-14b** #0 (1.11 s):
 
-> Wegen des schlechten Wetters haben wir uns zu Hause entschieden zu bleiben, obwohl wir Karten für das Konzert hatten.
+> Wegen des schlechten Wetters haben wir uns entschieden, zuhause zu bleiben, obwohl wir Karten für das Konzert hatten.
 
-**google/gemma-4-12b-qat** (31.46 s, thinking 3923 chars, finish=length, changed 100% of 18 words):
+**qwen/qwen3-14b** #1 (1.08 s):
 
-> 
+> Wegen des schlechten Wetters haben wir uns entschieden, zuhause zu bleiben, obwohl wir Karten für das Konzert hatten.
+
+**qwen/qwen3-14b** #2 (1.07 s):
+
+> Wegen des schlechten Wetters haben wir uns entschieden, zuhause zu bleiben, obwohl wir Karten für das Konzert hatten.
+
+**qwen/qwen3-4b-2507** #0 (0.4 s):
+
+> Wegen dem schlechten Wetter haben wir uns entschieden, zuhause zu bleiben, obwohl wir Karten für das Konzert hatten.
+
+**qwen/qwen3-4b-2507** #1 (0.35 s):
+
+> Wegen dem schlechten Wetter haben wir uns entschieden, zuhause zu bleiben, obwohl wir Karten für das Konzert hatten.
+
+**qwen/qwen3-4b-2507** #2 (0.35 s):
+
+> Wegen dem schlechten Wetter haben wir uns entschieden, zuhause zu bleiben, obwohl wir Karten für das Konzert hatten.
 
 ## de-polish-1 · polish
 
@@ -56,13 +108,29 @@ Original:
 
 > Wir haben das Verfahren benutzt weil es ist schnell und man kann es leicht machen und die Ergebnisse sind auch ziemlich gut gewesen.
 
-**google/gemma-4-e4b** (9.29 s, thinking 1560 chars, changed 52% of 23 words):
+**qwen/qwen3-14b** #0 (1.23 s):
 
-> Wir haben dieses Verfahren verwendet, weil es schnell und einfach anzuwenden ist und die Ergebnisse zudem recht gut waren.
+> Wir haben das Verfahren verwendet, weil es schnell ist und man es leicht ausführen kann; die Ergebnisse waren ziemlich gut.
 
-**google/gemma-4-12b-qat** (31.32 s, thinking 4472 chars, finish=length, changed 100% of 23 words):
+**qwen/qwen3-14b** #1 (0.99 s):
 
-> 
+> Wir haben das Verfahren verwendet, weil es schnell ist und leicht durchzuführen ist, und die Ergebnisse waren ziemlich gut.
+
+**qwen/qwen3-14b** #2 (1.04 s):
+
+> Wir haben das Verfahren verwendet, weil es schnell ist und man es leicht ausführen kann; die Ergebnisse waren ziemlich gut.
+
+**qwen/qwen3-4b-2507** #0 (0.41 s):
+
+> Wir haben das Verfahren benutzt, weil es schnell ist, einfach durchzuführen ist und ziemlich gute Ergebnisse liefert.
+
+**qwen/qwen3-4b-2507** #1 (0.32 s):
+
+> Wir haben das Verfahren benutzt, weil es schnell ist, einfach durchzuführen ist und ziemlich gute Ergebnisse liefert.
+
+**qwen/qwen3-4b-2507** #2 (0.32 s):
+
+> Wir haben das Verfahren benutzt, weil es schnell ist, einfach durchzuführen ist und ziemlich gute Ergebnisse liefert.
 
 ## de-en-1 · translate → English
 
@@ -72,13 +140,29 @@ Original:
 
 > Die Stadtverwaltung teilte am Dienstag mit, dass die Brücke ab dem 3. März für sechs Wochen gesperrt wird. Die Kosten belaufen sich auf rund 2,5 Millionen Euro.
 
-**google/gemma-4-e4b** (10.12 s, thinking 1600 chars):
+**qwen/qwen3-14b** #0 (1.33 s):
 
-> The city administration announced on Tuesday that the bridge will be closed starting March 3rd for six weeks. The costs amount to around 2.5 million Euros.
+> The city administration announced on Tuesday that the bridge will be closed for six weeks starting March 3. The costs amount to about 2.5 million euros.
 
-**google/gemma-4-12b-qat** (14.48 s, thinking 1670 chars):
+**qwen/qwen3-14b** #1 (1.02 s):
 
-> The city administration announced on Tuesday that the bridge will be closed for six weeks starting March 3rd. The costs amount to around 2.5 million euros.
+> The city administration announced on Tuesday that the bridge will be closed for six weeks starting March 3. The costs amount to about 2.5 million euros.
+
+**qwen/qwen3-14b** #2 (1.1 s):
+
+> The city administration announced on Tuesday that the bridge will be closed for six weeks starting March 3. The costs amount to about 2.5 million euros.
+
+**qwen/qwen3-4b-2507** #0 (0.47 s):
+
+> The city administration announced on Tuesday that the bridge will be closed for six weeks starting March 3. The costs amount to around 2.5 million euros.
+
+**qwen/qwen3-4b-2507** #1 (0.39 s):
+
+> The city administration announced on Tuesday that the bridge will be closed for six weeks starting March 3. The costs amount to around 2.5 million euros.
+
+**qwen/qwen3-4b-2507** #2 (0.37 s):
+
+> The city administration announced on Tuesday that the bridge will be closed for six weeks starting March 3. The costs amount to around 2.5 million euros.
 
 ## en-de-1 · translate → German
 
@@ -88,10 +172,422 @@ Original:
 
 > Please send me the signed contract by Friday. If you have any questions, feel free to call me.
 
-**google/gemma-4-e4b** (0.87 s):
+**qwen/qwen3-14b** #0 (1.36 s):
 
-> Bitte senden Sie mir den unterschriebenen Vertrag bis Freitag zu. Wenn Sie Fragen haben, zögern Sie nicht, mich anzurufen.
+> Schicken Sie mir bitte den unterschriebenen Vertrag bis Freitag zu. Falls Sie Fragen haben, zögern Sie nicht, mich anzurufen.
 
-**google/gemma-4-12b-qat** (28.67 s, thinking 3501 chars):
+**qwen/qwen3-14b** #1 (1.09 s):
 
-> Bitte senden Sie mir den unterzeichneten Vertrag bis Freitag zu. Wenn Sie Fragen haben, können Sie mich gerne anrufen.
+> Schicken Sie mir bitte den unterschriebenen Vertrag bis Freitag zu. Falls Sie Fragen haben, zögern Sie nicht, mich anzurufen.
+
+**qwen/qwen3-14b** #2 (1.05 s):
+
+> Schicken Sie mir bitte den unterschriebenen Vertrag bis Freitag zu. Falls Sie Fragen haben, zögern Sie nicht, mich anzurufen.
+
+**qwen/qwen3-4b-2507** #0 (0.41 s):
+
+> Bitte senden Sie mir den unterschriebenen Vertrag bis Freitag. Falls Sie Fragen haben, rufen Sie mich gerne an.
+
+**qwen/qwen3-4b-2507** #1 (0.34 s):
+
+> Bitte senden Sie mir den unterschriebenen Vertrag bis Freitag. Falls Sie Fragen haben, können Sie mich gerne anrufen.
+
+**qwen/qwen3-4b-2507** #2 (0.37 s):
+
+> Bitte senden Sie mir den unterschriebenen Vertrag bis Freitag. Falls Sie Fragen haben, zögern Sie nicht, mich zu kontaktieren.
+
+## de-r4-1 · fix
+
+Note: 没有错的句子。„wegen Umbau“（不带冠词的名词）是标准用法，„zuhause“ 是允许的写法，„3. März“ 的句点不能丢。
+
+Original:
+
+> Wegen Umbau bleibt das Geschäft bis zum 3. März geschlossen; zuhause arbeiten wir aber weiter.
+
+Expected:
+
+> Wegen Umbau bleibt das Geschäft bis zum 3. März geschlossen; zuhause arbeiten wir aber weiter.
+
+**qwen/qwen3-14b** #0 (0.96 s):
+
+> Wegen Umbau bleibt das Geschäft bis zum 3. März geschlossen; zu Hause arbeiten wir aber weiter.
+
+**qwen/qwen3-14b** #1 (0.88 s):
+
+> Wegen Umbau bleibt das Geschäft bis zum 3. März geschlossen; zu Hause arbeiten wir aber weiter.
+
+**qwen/qwen3-14b** #2 (0.91 s):
+
+> Wegen Umbau bleibt das Geschäft bis zum 3. März geschlossen; zu Hause arbeiten wir aber weiter.
+
+**qwen/qwen3-4b-2507** #0 (0.38 s):
+
+> Wegen des Umbaus bleibt das Geschäft bis zum 3. März geschlossen; zuhause arbeiten wir aber weiter.
+
+**qwen/qwen3-4b-2507** #1 (0.29 s):
+
+> Wegen des Umbaus bleibt das Geschäft bis zum 3. März geschlossen; zuhause arbeiten wir aber weiter.
+
+**qwen/qwen3-4b-2507** #2 (0.29 s):
+
+> Wegen des Umbaus bleibt das Geschäft bis zum 3. März geschlossen; zuhause arbeiten wir aber weiter.
+
+## de-r4-2 · fix
+
+Note: 三个从句的动词位置加三个逗号。最小改法是 14 个词里改 7 个，用来验证跑偏检查不误报，也验证没有词被删。
+
+Original:
+
+> Ich glaube das er hat gesagt das er kommt nicht weil er muss arbeiten.
+
+Expected:
+
+> Ich glaube, dass er gesagt hat, dass er nicht kommt, weil er arbeiten muss.
+
+**qwen/qwen3-14b** #0 (0.83 s):
+
+> Ich glaube, das er hat gesagt, dass er kommt nicht, weil er muss arbeiten.
+
+**qwen/qwen3-14b** #1 (0.76 s):
+
+> Ich glaube, das er hat gesagt, dass er kommt nicht, weil er muss arbeiten.
+
+**qwen/qwen3-14b** #2 (0.93 s):
+
+> Ich glaube, das er hat gesagt, dass er kommt nicht, weil er muss arbeiten.
+
+**qwen/qwen3-4b-2507** #0 (0.27 s):
+
+> Ich glaube, er hat gesagt, dass er kommt, nicht, weil er muss arbeiten.
+
+**qwen/qwen3-4b-2507** #1 (0.24 s):
+
+> Ich glaube, er hat gesagt, dass er kommt, nicht, weil er muss arbeiten.
+
+**qwen/qwen3-4b-2507** #2 (0.25 s):
+
+> Ich glaube, er hat gesagt, dass er kommt, nicht, weil er muss, arbeiten.
+
+## de-r4-3 · fix
+
+Note: 名词化和名词的大写要改，`flc-3` 必须保持小写，`FLC` 保持大写。直接检验 DE4-04。
+
+Original:
+
+> Beim schreiben des Berichts ist mir im allgemeinen nichts besonderes aufgefallen, aber die FLC-expression in flc-3 war niedriger als im wildtyp.
+
+Expected:
+
+> Beim Schreiben des Berichts ist mir im Allgemeinen nichts Besonderes aufgefallen, aber die FLC-Expression in flc-3 war niedriger als im Wildtyp.
+
+**qwen/qwen3-14b** #0 (1.48 s, = expected):
+
+> Beim Schreiben des Berichts ist mir im Allgemeinen nichts Besonderes aufgefallen, aber die FLC-Expression in flc-3 war niedriger als im Wildtyp.
+
+**qwen/qwen3-14b** #1 (1.52 s):
+
+> Beim Schreiben des Berichts ist mir im allgemeinen nichts Besonderes aufgefallen, aber die FLC-Expression in flc-3 war niedriger als im Wildtyp.
+
+**qwen/qwen3-14b** #2 (1.62 s, = expected):
+
+> Beim Schreiben des Berichts ist mir im Allgemeinen nichts Besonderes aufgefallen, aber die FLC-Expression in flc-3 war niedriger als im Wildtyp.
+
+**qwen/qwen3-4b-2507** #0 (0.49 s, = expected):
+
+> Beim Schreiben des Berichts ist mir im Allgemeinen nichts Besonderes aufgefallen, aber die FLC-Expression in flc-3 war niedriger als im Wildtyp.
+
+**qwen/qwen3-4b-2507** #1 (0.44 s, = expected):
+
+> Beim Schreiben des Berichts ist mir im Allgemeinen nichts Besonderes aufgefallen, aber die FLC-Expression in flc-3 war niedriger als im Wildtyp.
+
+**qwen/qwen3-4b-2507** #2 (0.43 s, = expected):
+
+> Beim Schreiben des Berichts ist mir im Allgemeinen nichts Besonderes aufgefallen, aber die FLC-Expression in flc-3 war niedriger als im Wildtyp.
+
+## de-r4-4 · fix
+
+Note: 称呼的大写。三处都是只改大小写。
+
+Original:
+
+> Könnten sie mir bitte sagen, ob sie den Vertrag schon unterschrieben haben? Ich habe ihnen die Unterlagen gestern geschickt.
+
+Expected:
+
+> Könnten Sie mir bitte sagen, ob Sie den Vertrag schon unterschrieben haben? Ich habe Ihnen die Unterlagen gestern geschickt.
+
+**qwen/qwen3-14b** #0 (1.12 s, = expected):
+
+> Könnten Sie mir bitte sagen, ob Sie den Vertrag schon unterschrieben haben? Ich habe Ihnen die Unterlagen gestern geschickt.
+
+**qwen/qwen3-14b** #1 (1.07 s, = expected):
+
+> Könnten Sie mir bitte sagen, ob Sie den Vertrag schon unterschrieben haben? Ich habe Ihnen die Unterlagen gestern geschickt.
+
+**qwen/qwen3-14b** #2 (1.01 s, = expected):
+
+> Könnten Sie mir bitte sagen, ob Sie den Vertrag schon unterschrieben haben? Ich habe Ihnen die Unterlagen gestern geschickt.
+
+**qwen/qwen3-4b-2507** #0 (0.36 s):
+
+> Könnten Sie mir bitte sagen, ob Sie den Vertrag bereits unterschrieben haben? Ich habe Ihnen die Unterlagen gestern geschickt.
+
+**qwen/qwen3-4b-2507** #1 (0.32 s):
+
+> Könnten Sie mir bitte sagen, ob Sie den Vertrag bereits unterschrieben haben? Ich habe Ihnen die Unterlagen gestern geschickt.
+
+**qwen/qwen3-4b-2507** #2 (0.32 s):
+
+> Könnten Sie mir bitte sagen, ob Sie den Vertrag bereits unterschrieben haben? Ich habe Ihnen die Unterlagen gestern geschickt.
+
+## de-r4-5 · fix
+
+Note: 复合词的连字符。`Col-0` 和 `10` 要保留；„10 Tage alten“ 不能被改成 „10-Tage-alten“。检验 DE4-05。
+
+Original:
+
+> Bitte schicken Sie mir Ihre Email Adresse und die Ergebnisse der DNA Sequenzierung der 10 Tage alten Col-0 Pflanzen.
+
+Expected:
+
+> Bitte schicken Sie mir Ihre E-Mail-Adresse und die Ergebnisse der DNA-Sequenzierung der 10 Tage alten Col-0-Pflanzen.
+
+**qwen/qwen3-14b** #0 (1.2 s, {"dropped_words": ["adresse", "sequenzierung"]}, = expected):
+
+> Bitte schicken Sie mir Ihre E-Mail-Adresse und die Ergebnisse der DNA-Sequenzierung der 10 Tage alten Col-0-Pflanzen.
+
+**qwen/qwen3-14b** #1 (1.19 s, {"dropped_words": ["adresse", "sequenzierung"]}, = expected):
+
+> Bitte schicken Sie mir Ihre E-Mail-Adresse und die Ergebnisse der DNA-Sequenzierung der 10 Tage alten Col-0-Pflanzen.
+
+**qwen/qwen3-14b** #2 (1.18 s, {"dropped_words": ["adresse", "sequenzierung"]}, = expected):
+
+> Bitte schicken Sie mir Ihre E-Mail-Adresse und die Ergebnisse der DNA-Sequenzierung der 10 Tage alten Col-0-Pflanzen.
+
+**qwen/qwen3-4b-2507** #0 (0.43 s, {"dropped_words": ["adresse", "sequenzierung", "alten"]}):
+
+> Bitte schicken Sie mir Ihre E-Mail-Adresse und die Ergebnisse der DNA-Seqenzierung der 10-tägigen Col-0-Pflanzen.
+
+**qwen/qwen3-4b-2507** #1 (0.38 s, {"dropped_words": ["adresse", "sequenzierung", "alten"]}):
+
+> Bitte schicken Sie mir Ihre E-Mail-Adresse und die Ergebnisse der DNA-Seqenzierung der 10-tägigen Col-0-Pflanzen.
+
+**qwen/qwen3-4b-2507** #2 (0.39 s, {"dropped_words": ["adresse", "sequenzierung", "alten"]}):
+
+> Bitte schicken Sie mir Ihre E-Mail-Adresse und die Ergebnisse der DNA-Seqenzierung der 10-tägigen Col-0-Pflanzen.
+
+## de-r4-6 · fix
+
+Note: 瑞士写法。只改 „zu Fuss“ 的大写，一个 ß 都不能出现。
+
+Original:
+
+> Die Strasse war wegen des grossen Schneefalls gesperrt, deshalb sind wir zu fuss gegangen.
+
+Expected:
+
+> Die Strasse war wegen des grossen Schneefalls gesperrt, deshalb sind wir zu Fuss gegangen.
+
+**qwen/qwen3-14b** #0 (1.0 s, = expected):
+
+> Die Strasse war wegen des grossen Schneefalls gesperrt, deshalb sind wir zu Fuss gegangen.
+
+**qwen/qwen3-14b** #1 (0.92 s, = expected):
+
+> Die Strasse war wegen des grossen Schneefalls gesperrt, deshalb sind wir zu Fuss gegangen.
+
+**qwen/qwen3-14b** #2 (0.89 s, = expected):
+
+> Die Strasse war wegen des grossen Schneefalls gesperrt, deshalb sind wir zu Fuss gegangen.
+
+**qwen/qwen3-4b-2507** #0 (0.31 s):
+
+> Die Straße war wegen des grossen Schneefalls gesperrt, deshalb sind wir zu Fuß gegangen.
+
+**qwen/qwen3-4b-2507** #1 (0.28 s):
+
+> Die Straße war wegen des grossen Schneefalls gesperrt, deshalb sind wir zu Fuß gegangen.
+
+**qwen/qwen3-4b-2507** #2 (0.28 s):
+
+> Die Straße war wegen des grossen Schneefalls gesperrt, deshalb sind wir zu Fuß gegangen.
+
+## de-r4-7 · fix
+
+Note: 奥地利用词（„Jänner“、„heuer“、„Sessel“）不能被换成 „Januar“、„dieses Jahr“、„Stühle“。同一句也可以拿去测润色，期望相同。
+
+Original:
+
+> Im Jänner haben wir heuer die Sessel im Besprechungszimmer getauscht.
+
+Expected:
+
+> Im Jänner haben wir heuer die Sessel im Besprechungszimmer getauscht.
+
+**qwen/qwen3-14b** #0 (0.74 s, = expected):
+
+> Im Jänner haben wir heuer die Sessel im Besprechungszimmer getauscht.
+
+**qwen/qwen3-14b** #1 (0.67 s, = expected):
+
+> Im Jänner haben wir heuer die Sessel im Besprechungszimmer getauscht.
+
+**qwen/qwen3-14b** #2 (0.67 s, = expected):
+
+> Im Jänner haben wir heuer die Sessel im Besprechungszimmer getauscht.
+
+**qwen/qwen3-4b-2507** #0 (0.25 s):
+
+> Im Jänner haben wir dieses Jahr die Sessel im Besprechungszimmer getauscht.
+
+**qwen/qwen3-4b-2507** #1 (0.22 s):
+
+> Im Jänner haben wir dieses Jahr die Sessel im Besprechungszimmer getauscht.
+
+**qwen/qwen3-4b-2507** #2 (0.22 s):
+
+> Im Jänner haben wir dieses Jahr die Sessel im Besprechungszimmer getauscht.
+
+## de-r4-8 · fix
+
+Note: 关系代词 das 和连词 dass 的区分、关系从句后的逗号、als 从句前的逗号。„…“ 引号和引号后的逗号要保留。„Morgen“→„morgen“ 是只改大小写。
+
+Original:
+
+> Das Buch, dass ich gestern gekauft habe ist spannender als ich dachte. Er sagte: „Das machen wir Morgen“, und ging.
+
+Expected:
+
+> Das Buch, das ich gestern gekauft habe, ist spannender, als ich dachte. Er sagte: „Das machen wir morgen“, und ging.
+
+**qwen/qwen3-14b** #0 (1.15 s):
+
+> Das Buch, das ich gestern gekauft habe, ist spannender als ich dachte. Er sagte: „Das machen wir morgen“, und ging.
+
+**qwen/qwen3-14b** #1 (1.09 s):
+
+> Das Buch, das ich gestern gekauft habe, ist spannender als ich dachte. Er sagte: „Das machen wir morgen“, und ging.
+
+**qwen/qwen3-14b** #2 (1.13 s):
+
+> Das Buch, das ich gestern gekauft habe, ist spannender als ich dachte. Er sagte: „Das machen wir morgen“, und ging.
+
+**qwen/qwen3-4b-2507** #0 (0.42 s, = expected):
+
+> Das Buch, das ich gestern gekauft habe, ist spannender, als ich dachte. Er sagte: „Das machen wir morgen“, und ging.
+
+**qwen/qwen3-4b-2507** #1 (0.37 s, = expected):
+
+> Das Buch, das ich gestern gekauft habe, ist spannender, als ich dachte. Er sagte: „Das machen wir morgen“, und ging.
+
+**qwen/qwen3-4b-2507** #2 (0.37 s, = expected):
+
+> Das Buch, das ich gestern gekauft habe, ist spannender, als ich dachte. Er sagte: „Das machen wir morgen“, und ging.
+
+## de-r4-9 · tone (friendly)
+
+Note: 语气变友好，但必须仍然是 Sie，截止日期和「逾期不收」这两个事实不能丢。
+
+Original:
+
+> Senden Sie die Unterlagen bis Freitag. Verspätete Einsendungen werden nicht berücksichtigt.
+
+Expected:
+
+> Könnten Sie mir die Unterlagen bitte bis Freitag schicken? Später eingehende Unterlagen können wir leider nicht mehr berücksichtigen.
+
+**qwen/qwen3-14b** #0 (1.23 s):
+
+> Schicken Sie die Unterlagen bis Freitag. Einsendungen, die nach diesem Datum kommen, werden nicht berücksichtigt.
+
+**qwen/qwen3-14b** #1 (0.96 s):
+
+> Schicken Sie die Unterlagen bis Freitag. Einsendungen, die nach diesem Datum kommen, werden nicht berücksichtigt.
+
+**qwen/qwen3-14b** #2 (0.9 s):
+
+> Schicken Sie die Unterlagen bis Freitag. Einsendungen, die nach diesem Datum kommen, werden nicht berücksichtigt.
+
+**qwen/qwen3-4b-2507** #0 (0.37 s):
+
+> Bitte schicken Sie die Unterlagen bis Freitag. Einsendungen nach Freitag werden leider nicht berücksichtigt.
+
+**qwen/qwen3-4b-2507** #1 (0.28 s):
+
+> Bitte schicken Sie die Unterlagen bis Freitag. Einsendungen nach Freitag werden leider nicht berücksichtigt.
+
+**qwen/qwen3-4b-2507** #2 (0.3 s):
+
+> Bitte schicken Sie die Unterlagen bis Freitag. Einsendungen mit Verspätung werden leider nicht berücksichtigt.
+
+## de-r4-10 · translate → German
+
+Note: „billion“ 是 „Milliarden“，不是 „Billionen“（差一千倍）。小数逗号、千位点、百分号前的空格、„…“ 引号、逗号在后引号的外面。
+
+Original:
+
+> Revenue rose 3.4% to 2.5 billion euros, and the company now has 1,250 employees. "We are very pleased," said the CEO.
+
+Expected:
+
+> Der Umsatz stieg um 3,4 % auf 2,5 Milliarden Euro, und das Unternehmen hat inzwischen 1.250 Beschäftigte. „Wir sind sehr zufrieden“, sagte der CEO.
+
+**qwen/qwen3-14b** #0 (1.99 s):
+
+> Der Umsatz stieg um 3,4 % auf 2,5 Milliarden Euro, und das Unternehmen beschäftigt nun 1.250 Mitarbeiter. „Wir sind sehr zufrieden“, sagte der Geschäftsführer.
+
+**qwen/qwen3-14b** #1 (1.67 s):
+
+> Der Umsatz stieg um 3,4 % auf 2,5 Milliarden Euro, und das Unternehmen beschäftigt nun 1.250 Mitarbeiter. „Wir sind sehr zufrieden“, sagte der Geschäftsführer.
+
+**qwen/qwen3-14b** #2 (1.73 s):
+
+> Der Umsatz stieg um 3,4 % auf 2,5 Milliarden Euro an, und das Unternehmen beschäftigt nun 1.250 Mitarbeiter. „Wir sind sehr zufrieden“, sagte der Geschäftsführer.
+
+**qwen/qwen3-4b-2507** #0 (0.61 s):
+
+> Der Umsatz stieg um 3,4 % auf 2,5 Milliarden Euro, und das Unternehmen verfügt nun über 1.250 Mitarbeiter. „Wir sind sehr zufrieden“, sagte der CEO.
+
+**qwen/qwen3-4b-2507** #1 (0.53 s):
+
+> Der Umsatz stieg um 3,4 % auf 2,5 Milliarden Euro, und das Unternehmen verfügt nun über 1.250 Mitarbeiter. „Wir sind sehr zufrieden“, sagte der CEO.
+
+**qwen/qwen3-4b-2507** #2 (0.52 s):
+
+> Der Umsatz stieg um 3,4 % auf 2,5 Milliarden Euro, und das Unternehmen verfügt nun über 1.250 Mitarbeiter. „Wir sind sehr zufrieden“, sagte der CEO.
+
+## de-r4-11 · translate → German
+
+Note: 明显的非正式语域，应当用 du，并且全文一致。和 en-de-1 配成一对。
+
+Original:
+
+> Hey, are you coming to the party tonight? Bring your sister if you want!
+
+Expected:
+
+> Hey, kommst du heute Abend zur Party? Bring deine Schwester mit, wenn du willst!
+
+**qwen/qwen3-14b** #0 (0.8 s, = expected):
+
+> Hey, kommst du heute Abend zur Party? Bring deine Schwester mit, wenn du willst!
+
+**qwen/qwen3-14b** #1 (0.73 s, = expected):
+
+> Hey, kommst du heute Abend zur Party? Bring deine Schwester mit, wenn du willst!
+
+**qwen/qwen3-14b** #2 (0.72 s, = expected):
+
+> Hey, kommst du heute Abend zur Party? Bring deine Schwester mit, wenn du willst!
+
+**qwen/qwen3-4b-2507** #0 (0.26 s):
+
+> Hey, kommst du zum Partei abends? Bring deine Schwester mit, wenn du willst!
+
+**qwen/qwen3-4b-2507** #1 (0.26 s):
+
+> Hey, kommst du zum Partyabend heute Abend? Bring deine Schwester mit, wenn du willst!
+
+**qwen/qwen3-4b-2507** #2 (0.26 s):
+
+> Hey, kommst du zum Partyabend heute Abend? Bring deine Schwester mit, wenn du willst!

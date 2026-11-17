@@ -26,3 +26,6 @@ releases/
 *.private
 *.pem
 .env
+
+# Per-developer signing team
+Config/Local.xcconfig

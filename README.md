@@ -8,7 +8,7 @@
 
 </div>
 
-> **Status: design stage.** There is no app to download yet. The design has been through four review rounds and the first build milestone (M0) has not started. See [`docs/DESIGN.md`](docs/DESIGN.md).
+> **Status: working prototype, not released.** There is no app to download yet. A prototype runs from source (see [`CONTRIBUTING.md`](CONTRIBUTING.md)); reading and writing other apps has not been verified on real apps yet. Design: [`docs/DESIGN.md`](docs/DESIGN.md). Model results: [`docs/MODELS.md`](docs/MODELS.md).
 
 GrammarBuddy is a menu-bar tool. Select text in any app, press a shortcut, and a small panel appears next to it:
 
@@ -69,7 +69,7 @@ It does not draw underlines in other apps as you type. It checks text when you a
 
 **开源的 macOS 写作搭子：改语法、润色、翻译，在任意 App 里都能用。**
 
-> **状态：设计阶段。** 现在还没有可以下载的 App。设计稿经过了四轮评审，第一个开发里程碑（M0）还没有开始。见 [`docs/DESIGN.md`](docs/DESIGN.md)。
+> **状态：能运行的原型，还没有发布。** 现在还没有可以下载的 App。原型可以从源码运行（见 [`CONTRIBUTING.md`](CONTRIBUTING.md)）；读写其他 App 还没有在真实 App 里验证。设计见 [`docs/DESIGN.md`](docs/DESIGN.md)，模型实测见 [`docs/MODELS.md`](docs/MODELS.md)。
 
 GrammarBuddy 是一个菜单栏工具。在任意 App 里选中文字，按一个快捷键，旁边弹出一个小面板：
 

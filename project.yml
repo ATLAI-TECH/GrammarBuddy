@@ -1,0 +1,81 @@
+name: GrammarBuddy
+options:
+  bundleIdPrefix: atlai
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+configFiles:
+  Debug: Config/Base.xcconfig
+  Release: Config/Base.xcconfig
+packages:
+  GrammarBuddyKit:
+    path: GrammarBuddyKit
+  # built-in model (design §7.7): Apple's MLX, Hugging Face downloader and tokenizers
+  mlx-swift-lm:
+    url: https://github.com/ml-explore/mlx-swift-lm
+    exactVersion: 3.32.3
+  swift-huggingface:
+    url: https://github.com/huggingface/swift-huggingface
+    from: 0.13.0
+  swift-transformers:
+    url: https://github.com/huggingface/swift-transformers
+    from: 1.3.5
+targets:
+  GrammarBuddy:
+    type: application
+    platform: macOS
+    sources:
+      - path: GrammarBuddy
+        excludes:
+          - "Resources/Word/**"
+      # Word scripts ship as source (a folder reference): if Xcode compiles them to .scpt, enums read back
+      # as raw codes («constant ****…») and write_edits fails with -1728 (docs/m0/word.md scripts)
+      - path: GrammarBuddy/Resources/Word
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: GrammarBuddyKit
+      - package: mlx-swift-lm
+        product: MLXLLM
+      - package: mlx-swift-lm
+        product: MLXLMCommon
+      - package: mlx-swift-lm
+        product: MLXHuggingFace
+      - package: swift-huggingface
+        product: HuggingFace
+      - package: swift-transformers
+        product: Tokenizers
+    info:
+      path: GrammarBuddy/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: GrammarBuddy
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSApplicationCategoryType: public.app-category.productivity
+        LSUIElement: true
+        NSAppleEventsUsageDescription: GrammarBuddy reads and writes the selected text in Microsoft Word, as tracked changes.
+        NSLocalNetworkUsageDescription: GrammarBuddy connects to a model server you set up on your local network.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSHumanReadableCopyright: Copyright © 2026 AtLAI-tech. MIT License.
+    entitlements:
+      path: GrammarBuddy/Resources/GrammarBuddy.entitlements
+      properties:
+        com.apple.security.automation.apple-events: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: atlai.GrammarBuddy
+        PRODUCT_NAME: GrammarBuddy
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: NO
+        COMBINE_HIDPI_IMAGES: YES
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "Apple Development"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        Release:
+          CODE_SIGN_IDENTITY: "Developer ID Application"

@@ -1,0 +1,3 @@
+// Team ID comes from Local.xcconfig (not committed). Copy Local.xcconfig.example to Local.xcconfig.
+// Contributors without the team: leave DEVELOPMENT_TEAM empty and build with scripts/dev-cert.sh (design §10).
+#include? "Local.xcconfig"
