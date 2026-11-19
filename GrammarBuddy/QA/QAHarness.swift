@@ -88,9 +88,18 @@ final class QAHarness {
         for step in text.split(whereSeparator: { $0 == "\n" || $0 == ";" }).map({ $0.trimmingCharacters(in: .whitespaces) }) where !step.isEmpty {
             // guard:<bundle id> — from then on, steps that touch the front app run only while that app is frontmost,
             // so a test can never act on whatever the user happens to be working in
-            if step.hasPrefix("guard:") { requiredFront = String(step.dropFirst(6)); out.append(step + " → ok"); continue }
+            if step.hasPrefix("guard:") {
+                requiredFront = String(step.dropFirst(6))
+                // the live checker of a test instance then looks at that app and nothing else. Without this a test
+                // instance followed the user into another app and accepted suggestions into what they were typing
+                // (2026-11-19): it must not even read text outside the app under test.
+                LiveChecker.shared.qaOnlyBundle = requiredFront
+                out.append(step + " → ok"); continue
+            }
             let name = String(step.split(separator: ":").first ?? "")
-            if let need = requiredFront, !need.isEmpty, ["frontselect", "frontread", "hotkey", "key", "click", "type", "realclick", "realkey", "realtype"].contains(name),
+            if let need = requiredFront, !need.isEmpty, (["frontselect", "frontread", "hotkey", "key", "click", "type", "realclick", "realkey", "realtype"].contains(name)
+                // live actions too, unless the checker is pinned to one process (then it can't reach another app)
+                || (name == "live" && LiveChecker.shared.qaTargetPID == nil && ["accept", "open", "key", "next"].contains { step.dropFirst(5).hasPrefix($0) })),
                NSWorkspace.shared.frontmostApplication?.bundleIdentifier != need {
                 out.append(step + " → SKIPPED: front app is \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"), not \(need)")
                 continue
@@ -109,6 +118,7 @@ final class QAHarness {
         let d = AppDelegate.shared
         switch targetName {
         case "panel": return PanelController.shared.panel
+        case "bubble": return SelectionWatcher.shared.qaBubble
         case "onboarding": return d?.onboardingWindow
         case "settings": return d?.settingsWindow
         case "test": return d?.testWindow
@@ -191,7 +201,7 @@ final class QAHarness {
             }
             let codes: [String: Int] = ["return": kVK_Return, "escape": kVK_Escape, "tab": kVK_Tab, "delete": kVK_Delete, "right": kVK_RightArrow,
                                         "left": kVK_LeftArrow, "up": kVK_UpArrow, "down": kVK_DownArrow, "pagedown": kVK_PageDown, "pageup": kVK_PageUp, "space": kVK_Space, "j": kVK_ANSI_J,
-                                        "g": kVK_ANSI_G, "t": kVK_ANSI_T, "z": kVK_ANSI_Z, "a": kVK_ANSI_A, "end": kVK_End, "home": kVK_Home]
+                                        "g": kVK_ANSI_G, "t": kVK_ANSI_T, "z": kVK_ANSI_Z, "a": kVK_ANSI_A, "f": kVK_ANSI_F, "end": kVK_End, "home": kVK_Home]
             guard let code = codes[k] else { return "unknown key" }
             let src = CGEventSource(stateID: .hidSystemState)
             for down in [true, false] {
@@ -216,7 +226,56 @@ final class QAHarness {
         case "axprobe": return await axProbe(arg)
         case "axtree": return axTree(arg)
         case "axwins": return axWins(arg)
+        case "strprobe":           // focused text element of the front app: does AXStringForRange agree with AXValue around `arg`?
+            guard let app = NSWorkspace.shared.frontmostApplication else { return "no app" }
+            let appEl = AXUIElementCreateApplication(app.processIdentifier)
+            var f: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(appEl, kAXFocusedUIElementAttribute as CFString, &f) == .success, let f else { return "no focus" }
+            let el = f as! AXUIElement
+            var v: CFTypeRef?
+            AXUIElementCopyAttributeValue(el, kAXValueAttribute as CFString, &v)
+            let ns = (v as? String ?? "") as NSString
+            var out = ["value utf16=\(ns.length) scalars=\((ns as String).unicodeScalars.count) chars=\((ns as String).count)"]
+            var from = 0
+            while from < ns.length {
+                let r = ns.range(of: arg, options: [], range: NSRange(location: from, length: ns.length - from))
+                if r.location == NSNotFound { break }
+                var line = "@\(r.location):"
+                for shift in [0, -1, -2, -3, -4] {
+                    line += " [\(shift)]“\(WriteBack.axString(el, NSRange(location: r.location + shift, length: r.length)) ?? "nil")”"
+                }
+                out.append(line); from = NSMaxRange(r)
+            }
+            return "\n" + out.joined(separator: "\n")
         case "wordax": return wordAX()
+        case "download":           // start a real built-in model download (first-use test); "downloadstate:<id>" reports
+            Task { await BuiltInModels.shared.download(arg) }
+            return "started"
+        case "downloadstate": return String(describing: BuiltInModels.shared.state(arg))
+        case "usebuiltin":         // what the panel's first-use button does once the model is there
+            PanelController.shared.model?.useBuiltInModel(arg); return "ok"
+        case "narrationtest":      // the pure part of the Word "Field" handling, on fixed cases
+            let doc = "Plants such as Arabidopsis thaliana grows fast in the lab (Smith 2020) and H2O is used.\rIn Springfield the Field Museum were closed (Lee 2021).\r"
+            var lines: [String] = []
+            for ax in ["Plants such as Arabidopsis thaliana grows fast in the lab Field (Smith 2020) and H2O is used.",
+                       "In Springfield the Field Museum were closed Field (Lee 2021)."] {
+                let hidden = LiveChecker.narration(in: ax, document: doc)
+                let sent = LiveChecker.removing(hidden, from: ax)
+                // pretend the model fixed the verb
+                let fixed = sent.replacingOccurrences(of: "grows fast", with: "grow fast").replacingOccurrences(of: "were closed", with: "was closed")
+                let back = LiveChecker.mapBack(WordDiff.changes(from: sent, to: fixed), hidden: hidden)
+                let ns = ax as NSString
+                lines.append("hidden=\(hidden.map { "\($0.location)+\($0.length)" }) sent=“\(sent)” changes=" + back.map { "\($0.removed)→\($0.inserted) at “\(ns.substring(with: $0.range))”" }.joined(separator: ", "))
+            }
+            return "\n" + lines.joined(separator: "\n")
+        case "bubble": SelectionWatcher.shared.qaShow(); return "shown"
+        case "bubblekeys":     // what a keyboard selection in the front app would bring up, and whether it takes keys
+            SelectionWatcher.shared.qaKeyboardSelection()
+            return "keyboardMode=\(SelectionWatcher.shared.keyboardMode) visible=\(SelectionWatcher.shared.qaBubble != nil)"
+        case "bubblekey":
+            let codes = ["return": kVK_Return, "tab": kVK_Tab, "escape": kVK_Escape, "a": kVK_ANSI_A]
+            let used = SelectionWatcher.shared.handleKey(codes[arg] ?? kVK_ANSI_A, modifiers: [])
+            return "used=\(used) visible=\(SelectionWatcher.shared.qaBubble != nil) panel=\(PanelController.shared.isOpen)"
         case "wordrects": return wordRects(arg)
         case "axdoc": return await axDoc(arg)
         case "live":
@@ -238,13 +297,18 @@ final class QAHarness {
                 return "pinned \(b) pid \(lc.qaTargetPID ?? 0)"
             }
             if arg.hasPrefix("accept="), let i = Int(arg.dropFirst(7)), lc.marks.indices.contains(i) { lc.accept(lc.marks[i]); return "accepting \(i)" }
+            if arg.hasPrefix("acceptat=") {      // by position, not by index: the list may have changed since the dump
+                let p = arg.dropFirst(9).split(separator: ",").compactMap { Int($0) }
+                guard p.count == 2, let m = lc.marks.first(where: { $0.range.location == p[0] && $0.range.length == p[1] }) else { return "NOMARK" }
+                return lc.accept(m) ? "accepting" : "BUSY"
+            }
             return lc.status + " | " + lc.dump().joined(separator: " ; ")
         case "set":
             let kv = arg.split(separator: "=", maxSplits: 1).map(String.init)
             guard kv.count == 2 else { return "bad" }
             if kv[1] == "true" || kv[1] == "false" { Store.defaults.set(kv[1] == "true", forKey: kv[0]) }
             else if kv[1] == "nil" { Store.defaults.removeObject(forKey: kv[0]) }
-            else if ["gb_languages", "gb_protected", "gb_local_only"].contains(kv[0]) {
+            else if ["gb_languages", "gb_protected", "gb_local_only", "gb_disabled_apps"].contains(kv[0]) {
                 Store.defaults.set(kv[1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }, forKey: kv[0])
             }
             else { Store.defaults.set(kv[1], forKey: kv[0]) }
@@ -734,6 +798,7 @@ final class QAHarness {
         case "diff": m.showDiff.toggle()
         case "retry": m.run()
         case "polishTranslate": m.translateAndPolish()
+        case "swap": m.swapLanguages()
         case "aiTranslate": if m.useSystemTranslation { m.toggleTranslationEngine() }
         case "sysTranslate": if !m.useSystemTranslation { m.toggleTranslationEngine() }
         case "undoWord": Task { await m.undoWord() }
@@ -782,12 +847,14 @@ final class QAHarness {
         var o: [String: Any] = [:]
         let pc = PanelController.shared
         o["panelOpen"] = pc.isOpen
+        o["panelSize"] = pc.panel.map { "\(Int($0.frame.width))×\(Int($0.frame.height))" } ?? ""
         o["panelIsKey"] = pc.panel?.isKeyWindow ?? false
         o["appIsActive"] = NSApp.isActive
         o["keyWindow"] = NSApp.keyWindow?.title ?? (NSApp.keyWindow.map { String(describing: type(of: $0)) } ?? "none")
         o["windows"] = NSApp.windows.filter(\.isVisible).map { "\($0.title.isEmpty ? String(describing: type(of: $0)) : $0.title) \(Int($0.frame.width))×\(Int($0.frame.height))" }
         o["lastToast"] = Toast.last ?? ""
         o["liveMarks"] = LiveChecker.shared.dump()
+        o["liveMarksDetail"] = LiveChecker.shared.dumpDetail()
         o["liveStatus"] = LiveChecker.shared.status
         o["liveValue"] = LiveChecker.shared.lastValue
         o["liveCard"] = LiveChecker.shared.activeMark.map { "\($0.removed) → \($0.inserted)" } ?? ""

@@ -64,6 +64,7 @@ final class LiveChecker {
 
     private(set) var marks: [LiveMark] = []
     var qaTargetPID: pid_t?
+    var qaOnlyBundle: String?                          // QA: never look at any other app (see QAHarness `guard:`)
     private(set) var status = ""                       // for Settings and the QA dump
     private var timer: Timer?
     private var element: AXUIElement?
@@ -98,9 +99,13 @@ final class LiveChecker {
         }
         otherMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .scrollWheel, .leftMouseDown]) { [weak self] e in
             let type = e.type
+            let isEsc = e.type == .keyDown && e.keyCode == UInt16(kVK_Escape)
             let at = NSEvent.mouseLocation
             Task { @MainActor in
                 if type == .leftMouseDown { self?.mouseDownAt = at }
+                // Esc always closes the card, also if the key tap isn't running (it only sees the key then, it can't
+                // keep it from the app)
+                if type == .keyDown, isEsc, self?.card.isVisible == true || self?.reviewing == true { self?.closeCard() }
                 // key presses are handled by KeyTap while the card is open; a click elsewhere or a scroll closes it
                 if type != .keyDown { self?.closeCard() }
                 if type == .scrollWheel { self?.refreshRects() }
@@ -128,6 +133,9 @@ final class LiveChecker {
 
     private func tick() {
         guard enabled else { return }
+        #if DEBUG
+        defer { writeDiagnosis() }
+        #endif
         guard SelectionReader.hasAccessibility else { status = L.t("需要辅助功能权限", "Needs the Accessibility permission"); clear(); return }
         guard let engine = Self.liveEngine() else {
             status = L.t("需要一个本机模型（设置 → AI → 内置模型）", "Needs a local model (Settings → AI → Built-in model)"); clear(); return
@@ -137,7 +145,14 @@ final class LiveChecker {
         let pinned = qaTargetPID.flatMap { NSRunningApplication(processIdentifier: $0) }
         guard let app = pinned ?? NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != NSRunningApplication.current.processIdentifier else { overlay.show([]); card.hide(); return }
+        if let only = qaOnlyBundle, !only.isEmpty, app.bundleIdentifier != only { clear(); status = "QA: waiting for \(only)"; return }
+        if AppState.shared.isDisabled(app.bundleIdentifier) {
+            lastAppName = app.localizedName ?? ""
+            clear(); status = L.t("已在这个 App 里停用（菜单栏图标里可以重新启用）", "Turned off in this app (turn it back on from the menu-bar icon)"); return
+        }
         let profile = AppProfiles.profile(for: app.bundleIdentifier ?? "")
+        lastAppName = app.localizedName ?? ""
+        lastEngineName = engine.kind == .builtin ? L.t("内置 ", "built-in ") + engine.model : engine.name + " " + engine.model
         // Chromium / Electron apps expose their text only after being asked (TextGeometry.swift)
         let isWord = profile.reader == .word
         if profile.reader == .clipboard || isWord { AXTree.enable(app) }
@@ -198,17 +213,30 @@ final class LiveChecker {
         status = L.t("实时检查：\(marks.count) 处", "Live check: \(marks.count) suggestion(s)")
     }
 
-    /// The engine for live checking: always local. The built-in model is used whenever one is ready, even if the
-    /// user's selected engine is LM Studio or an API, so live check doesn't depend on another app being open.
+    /// The engine for live checking: always local.
+    ///
+    /// 1. The engine the user selected, if it is a local one (built-in, LM Studio, Ollama, Apple Intelligence).
+    /// 2. Otherwise (the selected engine is an API) the built-in model if it is on disk, else any local engine.
+    ///
+    /// It used to prefer the built-in model even when the user had chosen LM Studio. On the user's 24 GB Mac that
+    /// meant loading a second 8 GB copy of the same Qwen3 14B that LM Studio already had in memory: with swap full
+    /// the load never finished, so nothing was ever marked (found 2026-11-17 with the status log). My own tests hid
+    /// it because they unloaded LM Studio first. If the selected local engine doesn't answer (LM Studio not running),
+    /// the built-in model takes over for ten minutes.
+    static var avoidConfiguredUntil = Date.distantPast
     static func liveEngine() -> EngineConfig? {
         let st = AppState.shared
-        // several QA instances share one LM Studio model instead of each loading its own built-in copy
-        if Store.defaults.bool(forKey: "gb_live_use_configured"), let e = st.localEngine { return e }
-        if let b = st.engines.first(where: { $0.kind == .builtin }) { return b }
-        let rec = BuiltInChoice.recommended(ramGB: st.ramGB)
-        let ready = BuiltInModels.shared.state(rec.id) == .ready ? rec : BuiltInChoice.catalog.first { BuiltInModels.shared.state($0.id) == .ready }
-        if let ready { return EngineConfig(id: "builtin-live", kind: .builtin, name: L.t("内置", "Built-in"), baseURL: "builtin:mlx", model: ready.id) }
-        return st.localEngine
+        if Store.defaults.bool(forKey: "gb_live_use_configured"), let e = st.localEngine { return e }      // QA
+        var builtIn: EngineConfig? = st.engines.first(where: { $0.kind == .builtin })
+        if builtIn == nil {
+            let rec = BuiltInChoice.recommended(ramGB: st.ramGB)
+            let ready = BuiltInModels.shared.state(rec.id) == .ready ? rec : BuiltInChoice.catalog.first { BuiltInModels.shared.state($0.id) == .ready }
+            if let ready { builtIn = EngineConfig(id: "builtin-live", kind: .builtin, name: L.t("内置", "Built-in"), baseURL: "builtin:mlx", model: ready.id) }
+        }
+        if let chosen = st.activeEngine, chosen.kind.isLocal, chosen.kind == .builtin || builtIn == nil || Date() > avoidConfiguredUntil {
+            return chosen
+        }
+        return builtIn ?? st.localEngine
     }
 
     private func focusedTextElement(pid: pid_t) -> AXUIElement? {
@@ -308,10 +336,20 @@ final class LiveChecker {
         let backend = Engines.backend(for: e)
         let lang = LanguageDirection.detect(text).language.map { LanguageDirection.englishName(LanguageDirectionHelpers.base($0)) }
         let system = Prompts.system(for: .fix, protectedWords: AppState.shared.protectedWords, sourceLanguage: lang)
+        let inWord = NSRunningApplication(processIdentifier: elementPID)?.bundleIdentifier == AppProfiles.word
         checking = Task { [weak self] in
+            // Word: take out the words that are not in the document (see `narration`), so the model reads the
+            // sentence as the user wrote it. `sent` is what the model gets; offsets are mapped back afterwards.
+            var hidden: [NSRange] = []
+            if inWord, Self.narrationTokens.contains(where: { text.contains($0) }) || text.range(of: " \\d{1,3}", options: .regularExpression) != nil,
+               let doc = await self?.wordDocumentText() {
+                hidden = Self.narration(in: text, document: doc)
+            }
+            let sent = Self.removing(hidden, from: text)
+            await MainActor.run { if !hidden.isEmpty { self?.narrationOf[text] = hidden } }
             var raw = ""
             do {
-                for try await ev in backend.run(EngineRequest(system: system, text: text), model: e.model) {
+                for try await ev in backend.run(EngineRequest(system: system, text: sent), model: e.model) {
                     if Task.isCancelled { return }
                     if case .text(let s) = ev { raw += s }
                     if raw.count > 4 * max(text.count, 40) { break }       // runaway output
@@ -322,15 +360,16 @@ final class LiveChecker {
                 // so that sentence was never looked at again (Word test: the first paragraph had no marks after
                 // live check was switched off and on).
                 let cancelled = Task.isCancelled
-                await MainActor.run { self?.checkFailed(text, cancelled: cancelled) }
+                let why = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                await MainActor.run { self?.checkFailed(text, cancelled: cancelled, why: why) }
                 return
             }
             if Task.isCancelled { return }
-            let out = Cleaner.clean(raw, original: text, operation: .fix)
-            let checks = Checks.run(original: text, result: out, operation: .fix, protectedWords: AppState.shared.protectedWords)
+            let out = Cleaner.clean(raw, original: sent, operation: .fix)
+            let checks = Checks.run(original: sent, result: out, operation: .fix, protectedWords: AppState.shared.protectedWords)
             // Only results that pass every check are shown; a live mark must never suggest something risky.
             var changes: [Change] = []
-            if !out.isEmpty && !checks.failed { changes = WordDiff.changes(from: text, to: out) }
+            if !out.isEmpty && !checks.failed { changes = Self.mapBack(WordDiff.changes(from: sent, to: out), hidden: hidden) }
             if checks.failed || out.isEmpty {
                 let line = "\(text.prefix(50))… ⇒ \(out.isEmpty ? "(empty)" : String(out.prefix(160))) | \(String(describing: checks).prefix(300))"
                 await MainActor.run { self?.rejected.append(line); if (self?.rejected.count ?? 0) > 20 { self?.rejected.removeFirst() } }
@@ -339,12 +378,123 @@ final class LiveChecker {
         }
     }
 
+    // MARK: Word: words that only Accessibility adds
+    // Word's accessibility text is a narration: before every field (a Zotero / EndNote citation, a date, a
+    // cross-reference) it says "Field". That word is not in the document. Sent to the model as it was, the sentence
+    // read "…in the lab Field (Smith 2020)…" and the citation looked like a word called Field (user, 2026-11-19).
+    // An occurrence is narration when the text around it exists in the document WITHOUT it and not with it.
+
+    static let narrationTokens = ["Field ", "域 "]
+    private var narrationOf: [String: [NSRange]] = [:]       // sentence (as Accessibility gives it) → narration ranges in it
+    private var wordDoc: (text: String, at: Date)?
+
+    private func wordDocumentText() async -> String? {
+        if let d = wordDoc, Date().timeIntervalSince(d.at) < 4 { return d.text }
+        guard let t = await WordBridge.documentText() else { return nil }
+        wordDoc = (t, Date())
+        return t
+    }
+
+    static func narration(in sentence: String, document: String) -> [NSRange] {
+        let ns = sentence as NSString
+        var out: [NSRange] = []
+        for token in narrationTokens {
+            var from = 0
+            while from < ns.length {
+                let r = ns.range(of: token, options: [], range: NSRange(location: from, length: ns.length - from))
+                if r.location == NSNotFound { break }
+                from = NSMaxRange(r)
+                // a word boundary in front: "Field " inside "Springfield " is not it
+                if r.location > 0, let u = Unicode.Scalar(ns.character(at: r.location - 1)), CharacterSet.alphanumerics.contains(u) { continue }
+                let a = max(0, r.location - 14), b = min(ns.length, NSMaxRange(r) + 14)
+                let left = ns.substring(with: NSRange(location: a, length: r.location - a))
+                let right = ns.substring(with: NSRange(location: NSMaxRange(r), length: b - NSMaxRange(r)))
+                guard (left + right).count >= 8 else { continue }
+                if document.contains(left + right) && !document.contains(left + token + right) { out.append(r) }
+            }
+        }
+        // Footnote and endnote references: Word has one invisible mark there (U+0002); Accessibility reads it out as
+        // " 1". Left in, the model drops the stray number and the "a number changed" check then throws the whole
+        // sentence away.
+        if document.contains("\u{2}"), let re = try? NSRegularExpression(pattern: " \\d{1,3}") {
+            for m in re.matches(in: sentence, range: NSRange(location: 0, length: ns.length)) {
+                let r = m.range
+                let a = max(0, r.location - 12), b = min(ns.length, NSMaxRange(r) + 6)
+                let left = ns.substring(with: NSRange(location: a, length: r.location - a))
+                let right = ns.substring(with: NSRange(location: NSMaxRange(r), length: b - NSMaxRange(r)))
+                guard left.count >= 4 else { continue }
+                if document.contains(left + "\u{2}" + right) { out.append(r) }
+            }
+        }
+        return out.sorted { $0.location < $1.location }
+    }
+
+    static func removing(_ ranges: [NSRange], from text: String) -> String {
+        guard !ranges.isEmpty else { return text }
+        let m = NSMutableString(string: text)
+        for r in ranges.sorted(by: { $0.location > $1.location }) { m.deleteCharacters(in: r) }
+        return m as String
+    }
+
+    /// Changes found in the text without the narration → the same changes in the text with it. A change that would
+    /// straddle a narration word is dropped.
+    static func mapBack(_ changes: [Change], hidden: [NSRange]) -> [Change] {
+        guard !hidden.isEmpty else { return changes }
+        // position of each narration word in the cleaned text, and its length
+        var cut: [(at: Int, len: Int)] = [], removed = 0
+        for h in hidden { cut.append((h.location - removed, h.length)); removed += h.length }
+        var out: [Change] = []
+        for var c in changes {
+            if cut.contains(where: { $0.at > c.range.location && $0.at < NSMaxRange(c.range) }) { continue }
+            c.range.location += cut.filter { $0.at <= c.range.location }.reduce(0) { $0 + $1.len }
+            out.append(c)
+        }
+        return out
+    }
+
     private var failedAt: [String: Date] = [:]      // sentences whose check failed: tried again after a while
-    private func checkFailed(_ text: String, cancelled: Bool) {
+    private var consecutiveFailures = 0
+    private func checkFailed(_ text: String, cancelled: Bool, why: String = "") {
         if checkingKey == text { checking = nil; checkingKey = nil }
         AppDelegate.shared?.updateIcon()
-        if !cancelled { failedAt[text] = Date(); if failedAt.count > 200 { failedAt.removeAll() } }
+        if !cancelled {
+            failedAt[text] = Date(); if failedAt.count > 200 { failedAt.removeAll() }
+            lastProblem = why; lastProblemAt = Date()
+            // the selected engine is another app (LM Studio, Ollama) and it didn't answer: use the built-in model for a while
+            if let chosen = AppState.shared.activeEngine, chosen.kind.isLocal, chosen.kind != .builtin {
+                consecutiveFailures += 1
+                if consecutiveFailures >= 2 { Self.avoidConfiguredUntil = Date().addingTimeInterval(600); consecutiveFailures = 0; failedAt.removeAll() }
+            }
+        }
     }
+
+    /// Why nothing is being marked, in words: shown in the menu-bar menu. Without it a user who sees no underlines
+    /// has no way to tell "nothing wrong with the text" from "the model didn't answer" or "no permission".
+    private(set) var lastProblem = ""
+    private var lastProblemAt = Date.distantPast
+    private(set) var lastEngineName = ""
+    private(set) var lastAppName = ""
+    var diagnosis: String {
+        guard enabled else { return L.t("实时标记已关闭", "Live check is off") }
+        var parts: [String] = []
+        if !lastAppName.isEmpty { parts.append(lastAppName) }
+        parts.append(status.isEmpty ? L.t("光标不在可检查的文本框里", "The cursor isn't in a text box that can be checked") : status)
+        if !lastEngineName.isEmpty { parts.append(L.t("模型：", "Model: ") + lastEngineName) }
+        if !lastProblem.isEmpty, Date().timeIntervalSince(lastProblemAt) < 120 { parts.append(L.t("上次检查失败：", "Last check failed: ") + String(lastProblem.prefix(120))) }
+        return parts.joined(separator: " · ")
+    }
+    #if DEBUG
+    private var lastDiagnosisWritten = ""
+    private func writeDiagnosis() {
+        let d = diagnosis
+        guard d != lastDiagnosisWritten else { return }
+        lastDiagnosisWritten = d
+        let line = ISO8601DateFormatter().string(from: Date()) + "  " + d + "\n"
+        let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("grammarbuddy-live-status.log")
+        if let h = try? FileHandle(forWritingTo: url) { h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); try? h.close() }
+        else { try? line.write(to: url, atomically: true, encoding: .utf8) }
+    }
+    #endif
 
     private func finishCheck(_ text: String, changes: [Change]?, located: Bool = false) {
         // Word: a suggestion that can't be found in the document itself (it touches words that only Accessibility
@@ -367,6 +517,7 @@ final class LiveChecker {
             return
         }
         checking = nil; checkingKey = nil
+        consecutiveFailures = 0
         AppDelegate.shared?.updateIcon()
         cache[text] = changes ?? []
         cacheOrder.append(text)
@@ -399,7 +550,10 @@ final class LiveChecker {
                 var mark = LiveMark(id: p.text + "|\(c.range.location)|\(c.range.length)",
                                     range: NSRange(location: p.range.location + c.range.location, length: c.range.length),
                                     removed: c.removed, inserted: c.inserted, rect: rect, paragraphKey: p.text)
-                let head = pns.substring(to: c.range.location), tail = pns.substring(from: NSMaxRange(c.range))
+                var head = pns.substring(to: c.range.location), tail = pns.substring(from: NSMaxRange(c.range))
+                if narrationOf[p.text] != nil {       // the card shows the neighbouring words: not the narration
+                    for t in Self.narrationTokens { head = head.replacingOccurrences(of: t, with: ""); tail = tail.replacingOccurrences(of: t, with: "") }
+                }
                 mark.before = head.split(whereSeparator: \.isWhitespace).last.map(String.init) ?? ""
                 mark.after = tail.split(whereSeparator: \.isWhitespace).first.map(String.init) ?? ""
                 out.append(mark)
@@ -521,11 +675,11 @@ final class LiveChecker {
         reviewing = true
         writing = false
         let i = (marks.firstIndex(of: m) ?? 0) + 1
-        keysWork = KeyTap.shared.start()
+        keysWork = KeyTap.shared.start()      // ⏎ accept and Esc close always work while a card is open
         card.show(mark: m, position: keyboard ? "\(i)/\(marks.count)" : "", keys: keysWork, review: keyboard,
                   accept: { [weak self] in self?.accept(m, advance: keyboard) }, ignore: { [weak self] in self?.ignore(m, advance: keyboard) },
                   ignoreAll: { [weak self] in self?.ignoreParagraph(m) })
-        keysWork = KeyTap.shared.start()
+        keysWork = KeyTap.shared.start()      // ⏎ accept and Esc close always work while a card is open
         Announcer.say(spoken(m) + (i == 1 ? L.t("。回车采用，Tab 跳过，删除键忽略，Esc 关闭", ". Return accepts, Tab skips, Delete ignores, Escape closes") : ""), high: true)
     }
 
@@ -614,6 +768,8 @@ final class LiveChecker {
             if plain && acceptKey && Date() < swallowUntil { return true }
             return false
         }
+        // Esc closes the card in every state: while a change is being written, with no card on screen, on a repeat
+        if plain && keyCode == kVK_Escape { closeCard(); return true }
         guard plain else { closeCard(); return false }            // ⌘⏎, ⌥⏎, ⇧⏎ … belong to the app
         // skip and ignore keys exist only in a ⌃⌘J review; in a clicked card they belong to the app
         let skipKey = keyboardReview && rawSkip
@@ -655,6 +811,7 @@ final class LiveChecker {
     @discardableResult
     func accept(_ m: LiveMark, advance: Bool = false) -> Bool {
         guard let el = element, !writing else { return false }
+        if let only = qaOnlyBundle, !only.isEmpty, NSRunningApplication(processIdentifier: elementPID)?.bundleIdentifier != only { return false }
         card.hide()                      // the review itself stays on: keys are still ours while the change is written
         writing = true
         let pid = elementPID
@@ -693,22 +850,31 @@ final class LiveChecker {
         }
         let handle = WriteHandle(pid: pid, element: el)
         Task {
+            let expected = WriteBack.expectation(el, range: m.range)
             var res = await WriteBack.axReplace(handle: handle, range: m.range, oldFull: m.removed, newFull: m.inserted)
             var why: String?
-            // Chromium / Electron often ignore AXSelectedText: select the range, then paste (or press Delete for a removal)
-            if res != .verified, AXTree.needsSwitch(bundle), WriteBack.axString(el, m.range) == m.removed || m.range.length == 0 {
+            // Many apps ignore a write through AXSelectedText (Chromium, Electron, WebKit editors such as Outlook's
+            // compose box: "Couldn't replace this one" every time). Then: select the range, check that the app really
+            // selected it, and paste (or press Delete for a removal). Without the check nothing is pasted.
+            if res != .verified, WriteBack.axString(el, m.range) == m.removed || m.range.length == 0 {
                 if NSWorkspace.shared.frontmostApplication?.processIdentifier != pid {
                     why = L.t("这个 App 不在最前面，没法替换。切到它再试", "That app isn't in front, so the change can't be made. Switch to it and try again")
-                } else if WriteBack.setRange(el, m.range) {
-                    try? await Task.sleep(nanoseconds: 60_000_000)
+                } else if await WriteBack.select(el, m.range, expect: m.removed) {
+                    let newLen = (m.inserted as NSString).length
                     if m.inserted.isEmpty {
                         Keys.post(keyCode: CGKeyCode(kVK_Delete), flags: [])
-                        try? await Task.sleep(nanoseconds: 250_000_000)
-                        res = WriteBack.axString(el, m.range) != m.removed ? .verified : .unverified
                     } else {
-                        res = await WriteBack.paste(m.inserted, handle: handle, unknownEditability: false)
-                        if res == .pasted { res = .verified }
+                        _ = await WriteBack.paste(m.inserted, handle: handle, unknownEditability: false)
                     }
+                    res = .unverified
+                    _ = newLen
+                    for _ in 0..<12 {
+                        try? await Task.sleep(nanoseconds: 50_000_000)
+                        if WriteBack.landed(el, range: m.range, new: m.inserted, expected: expected) { res = .verified; break }
+                    }
+                    if res != .verified { why = L.t("已经粘贴，但没法确认结果，请看一眼这个词", "Pasted, but the result couldn't be confirmed; please check this word") }
+                } else {
+                    why = L.t("这个 App 不让别的程序选中文字，没法替换这一处。可以选中这句话，用「改错」按钮", "This app doesn't let other programs select text, so this one can't be replaced. Select the sentence and use the Fix button instead")
                 }
             }
             if res == .verified {
@@ -790,6 +956,11 @@ final class LiveChecker {
     /// QA: front-to-back window order and which window the overlay follows.
     func zOrder() -> String { "overlay window #\(overlay.windowNumber) follows #\(overlay.targetWindow) | " + LiveOverlay.zOrder().joined(separator: " > ") }
 
+    /// QA: exact range and texts of each mark, to check that accepting one changes exactly that piece.
+    func dumpDetail() -> [[String: Any]] {
+        marks.map { ["loc": $0.range.location, "len": $0.range.length, "removed": $0.removed, "inserted": $0.inserted, "deliberate": $0.needsDeliberateAccept] }
+    }
+
     /// QA: one line per mark.
     func dump() -> [String] {
         marks.enumerated().map { "\($0): \($1.removed.isEmpty ? "+" : $1.removed) → \($1.inserted.isEmpty ? "(delete)" : $1.inserted) @ \(Int($1.rect.minX)),\(Int($1.rect.minY)) \(Int($1.rect.width))×\(Int($1.rect.height))" }
@@ -822,7 +993,9 @@ final class LiveOverlay {
             w.hasShadow = false
             w.ignoresMouseEvents = true
             w.level = .normal
-            w.collectionBehavior = [.fullScreenAuxiliary, .ignoresCycle]
+            // .canJoinAllSpaces: the window was created on one desktop; without it it cannot be shown in another
+            // Space, e.g. next to an app in full screen. It is only ever visible where the target window is.
+            w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
             w.isReleasedWhenClosed = false
             w.contentView = view
             window = w
@@ -962,7 +1135,7 @@ private struct CardView: View {
     var ignoreAll: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 if mark.removed.isEmpty {
                     // an insertion is shown between its neighbours: "you [a] 15%"
@@ -983,16 +1156,28 @@ private struct CardView: View {
                 if !position.isEmpty { Text(position).font(.caption2).foregroundStyle(.tertiary) }
             }
             HStack(spacing: 8) {
-                // drawn by hand: a system prominent button turns grey in a panel that isn't the key window (I8-05)
+                // Big targets: the card is used with the mouse. Drawn by hand, because a system prominent button turns
+                // grey in a panel that isn't the key window (I8-05).
                 Button(action: accept) {
-                    Text(L.t("采用", "Accept")).font(.callout.weight(.semibold)).foregroundStyle(.white)
-                        .padding(.horizontal, 10).padding(.vertical, 3)
-                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 6))
+                    Text(L.t("采用", "Accept")).font(.body.weight(.semibold)).foregroundStyle(.white)
+                        .frame(minWidth: 84).padding(.horizontal, 14).padding(.vertical, 8)
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
+                        .contentShape(Rectangle())
                 }.buttonStyle(.plain)
-                Button(L.t("忽略", "Ignore"), action: ignore).controlSize(.small)
-                Button(L.t("这句都忽略", "Ignore sentence"), action: ignoreAll).controlSize(.small).buttonStyle(.link)
+                Button(action: ignore) {
+                    Text(L.t("忽略", "Ignore")).font(.body)
+                        .frame(minWidth: 64).padding(.horizontal, 14).padding(.vertical, 8)
+                        .background(Color.primary.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+                        .contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                Button(L.t("这句都忽略", "Ignore sentence"), action: ignoreAll).buttonStyle(.link)
             }
-            if !keys {
+            if !AppState.shared.shortcutsOn && keys {
+                // the two keys that always work while a card is open; everything else is done by clicking
+                Text(mark.needsDeliberateAccept ? L.t("改的是大小写或记号：按两次 ⏎ 确认 · Esc 关闭", "Changes case or an identifier: press ⏎ twice · Esc close")
+                                                : L.t("⏎ 采用 · Esc 关闭", "⏎ accept · Esc close"))
+                    .font(.caption).foregroundStyle(mark.needsDeliberateAccept ? .orange : .secondary)
+            } else if !keys {
                 Text(L.t("按键现在不可用，请用鼠标点", "Keys aren't available right now; please click")).font(.caption2).foregroundStyle(.orange)
             } else {
                 let tab = LiveChecker.shared.acceptWithTab
@@ -1004,7 +1189,8 @@ private struct CardView: View {
                 Text(hint).font(.caption2).foregroundStyle(mark.needsDeliberateAccept ? .orange : .secondary)
             }
         }
-        .padding(10)
+        .font(.title3)
+        .padding(12)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary))
         .accessibilityElement(children: .contain)
@@ -1029,7 +1215,7 @@ final class KeyTap {
         let callback: CGEventTapCallBack = { _, type, event, _ in
             if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
                 // re-enable only while a review is on; otherwise stay out of the way
-                let on = MainActor.assumeIsolated { LiveChecker.shared.reviewing }
+                let on = MainActor.assumeIsolated { LiveChecker.shared.reviewing || SelectionWatcher.shared.keyboardMode }
                 if on, let t = KeyTap.shared.tap { CGEvent.tapEnable(tap: t, enable: true) }
                 return Unmanaged.passUnretained(event)
             }
@@ -1038,7 +1224,9 @@ final class KeyTap {
             let flags = event.flags
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             // the tap's run-loop source is on the main run loop, so this runs on the main thread
-            let used = MainActor.assumeIsolated { LiveChecker.shared.handleKey(code, modifiers: flags, isRepeat: isRepeat) }
+            let used = MainActor.assumeIsolated {
+                SelectionWatcher.shared.handleKey(code, modifiers: flags) || LiveChecker.shared.handleKey(code, modifiers: flags, isRepeat: isRepeat)
+            }
             return used ? nil : Unmanaged.passUnretained(event)
         }
         guard let t = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,

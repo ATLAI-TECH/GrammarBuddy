@@ -29,6 +29,7 @@ final class WordReadInfo {
     var footnotes: [Int] = []
     var tables: [(start: Int, end: Int)] = []
     var writtenRanges: [(Int, Int)] = []   // EDIT records of the last write, for "undo this change"
+    var writtenPlain: [(start: Int, new: String, old: String)] = []   // direct replacements of the last write, for undo
     var error: String?                     // ERROR record of read_selection (view pinning or text read failed)
 }
 
@@ -242,7 +243,7 @@ enum WordMap {
 
     /// argv for write_edits.applescript: docName fullName mode rs re rtext, then per change s e new len cs ce ctx.
     /// `changes` must already be filtered (accepted, not skipped); they are sent in document order.
-    static func writeArgs(_ changes: [Change], info: WordReadInfo, mode: String = "track") -> [String] {
+    static func writeArgs(_ changes: [Change], info: WordReadInfo, mode: String = "plain") -> [String] {
         let raw = Array(info.text.utf16)
         var args = [info.docName, info.fullName, mode, String(info.start), String(info.end), info.text]
         for c in changes.sorted(by: { $0.range.location < $1.range.location }) {
@@ -261,6 +262,7 @@ enum WordMap {
         var edits: [(k: Int, start: Int, end: Int)] = []
         var revs: [(k: Int, type: String, start: Int, end: Int)] = []
         var checked = false
+        var tracked = true                 // false: replaced directly, no revisions were made
         /// Edits whose revisions are not all an insert/delete inside the edit's own range (merged with a neighbour).
         var strayEdits: [Int] {
             edits.filter { e in revs.contains { $0.k == e.k && ($0.start < e.start || $0.end > e.end || !($0.type.contains("insert") || $0.type.contains("delete"))) } }.map(\.k)
@@ -277,6 +279,7 @@ enum WordMap {
             case "EDIT" where r.count >= 4: o.edits.append((n[0], n[1], n[2]))
             case "REV" where r.count >= 5: o.revs.append((n[0], r[2], n[2], n[3]))
             case "CHECKED": o.checked = true
+            case "MODE" where r.count >= 2: o.tracked = r[1] == "tracked"
             default: break
             }
         }

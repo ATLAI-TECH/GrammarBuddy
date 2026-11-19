@@ -22,7 +22,7 @@ struct Failure: Equatable {
     var message: String
     var action: FailureAction?
 }
-enum FailureAction: Equatable { case openSettings, openLMStudio, retry, grantAccessibility, chooseEngine, openAutomationSettings }
+enum FailureAction: Equatable { case setUpModel, openSettings, openLMStudio, retry, grantAccessibility, chooseEngine, openAutomationSettings }
 
 struct ResultNote: Equatable {
     var text: String
@@ -70,6 +70,8 @@ final class PanelModel {
     var lastWordWrite: (changes: [Change], newLength: Int)?
     var qaSimulated = false        // QA harness capture: writes are logged, not performed
     var qaLog: [String] = []
+    var panelFill = false                 // the user dragged the panel to a size: the text area fills it
+    var panelMaxContent: CGFloat = 300    // tallest the text area grows by itself (translation gets more)
     var onClose: (() -> Void)?
     var onYieldKeyboard: (() async -> Void)?
     var onReclaimKeyboard: (() -> Void)?
@@ -212,7 +214,8 @@ final class PanelModel {
                 phase = .failed(Failure(message: L.t("这个 App 设成了只用本机的模型，但还没有配置本机模型，所以不处理。",
                                                       "This app is set to use only a local model, and none is set up, so nothing was sent."), action: .openSettings))
             } else {
-                phase = .failed(Failure(message: L.t("改错需要一个 AI 引擎。翻译照常可用。", "Fix needs an AI engine. Translation works without one."), action: .openSettings))
+                phase = .failed(Failure(message: L.t("\(OpNames.name(operation))需要一个 AI 模型，这台 Mac 上还没有设置。翻译不需要，照常可用。",
+                                                      "\(OpNames.name(operation)) needs an AI model and none is set up on this Mac yet. Translation works without one."), action: .setUpModel))
             }
             return
         }
@@ -437,10 +440,34 @@ final class PanelModel {
         run()
     }
 
+    /// The ⇄ button: translate the other way round (English → Chinese becomes Chinese → English). Used when the
+    /// guess at the source language was wrong, or the text mixes both and the other direction was meant.
+    func swapLanguages() {
+        guard sourceLang != targetLang else { return }
+        (sourceLang, targetLang) = (targetLang, sourceLang)
+        showLanguageMenu = false
+        sourceConfirmed = true
+        run()
+    }
+
     func setSource(_ code: String) {
         sourceLang = code
         targetLang = LanguageDirection.target(source: code, mine: state.myLanguages, lastTargets: state.lastTargets)
         if phase != .askSource { sourceConfirmed = true; run() }
+    }
+
+    /// First use, no model yet: one click in the panel sets up the built-in model (downloading it if this Mac doesn't
+    /// have it) and then does what was asked. No trip to Settings.
+    func useBuiltInModel(_ id: String) {
+        Task {
+            let models = BuiltInModels.shared
+            if models.state(id) != .ready { await models.download(id) }
+            guard models.state(id) == .ready else { return }        // the failure is shown by the quick-start view
+            let s = EngineSetup()
+            s.builtInModel = id
+            s.saveBuiltIn()
+            run()
+        }
     }
 
     func confirmSourceAndRun() {
@@ -594,7 +621,7 @@ final class PanelModel {
             }
             if case .available(let cs) = rec.putBack, !cs.isEmpty, !confirmed, !confirmArmed {
                 confirmArmed = true
-                let msg = (rec.confirmText ?? "") + L.t("。再按一次 ⌘⏎ 确认", ". Press ⌘⏎ again to confirm")
+                let msg = (rec.confirmText ?? "") + (state.shortcutsOn ? L.t("。再按一次 ⌘⏎ 确认", ". Press ⌘⏎ again to confirm") : L.t("。再点一次「替换」确认", ". Click Replace again to confirm"))
                 note = ResultNote(text: msg)
                 return
             }
@@ -609,7 +636,7 @@ final class PanelModel {
         guard let h = handle else { return }
         if qaSimulated {
             log("word.trackedChange \(acceptedCount) changes")
-            note = ResultNote(text: L.t("已写入 \(acceptedCount) 处修订（QA 模拟，没有真的写入 Word）", "Wrote \(acceptedCount) tracked change(s) (QA simulation, Word not touched)"), undo: true)
+            note = ResultNote(text: L.t("已替换 \(acceptedCount) 处（QA 模拟，没有真的写入 Word）", "Replaced \(acceptedCount) place(s) (QA simulation, Word not touched)"), undo: true)
             didWrite = true
             return
         }
@@ -625,7 +652,7 @@ final class PanelModel {
             return
         }
         let ok = await WordBridge.rejectRevisions(capture: cap, handle: h, newLength: w.newLength)
-        note = ResultNote(text: ok ? L.t("已撤销本次修改", "Undid this change") : L.t("没能撤销，可以在 Word 的修订窗格里逐条拒绝", "Couldn't undo; reject the changes in Word's Revisions pane"))
+        note = ResultNote(text: ok ? L.t("已撤销本次修改", "Undid this change") : L.t("没能完全撤销（文字之后又变了），可以在 Word 里按 ⌘Z", "Couldn't undo all of it (the text changed afterwards); press ⌘Z in Word"))
         lastWordWrite = nil
     }
 
@@ -753,7 +780,7 @@ enum ActionNames {
     static func name(_ a: PanelAction) -> String {
         switch a {
         case .replace: return L.t("替换", "replace")
-        case .trackedChange: return L.t("写为修订", "write as tracked changes")
+        case .trackedChange: return L.t("替换", "replace")
         case .insertBelow: return L.t("插入到原文下方", "insert below")
         case .copy: return L.t("复制", "copy")
         }

@@ -72,6 +72,8 @@ final class BuiltInModels {
 
     /// LM Studio's MLX copy of the same model, if present and complete.
     func localFolder(_ c: BuiltInChoice) -> URL? {
+        // QA: behave like a Mac that has never had LM Studio, to test the real first download
+        if Store.defaults.bool(forKey: "gb_ignore_lmstudio_models") { return nil }
         let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".lmstudio/models/" + c.lmStudioFolder)
         let fm = FileManager.default
         guard fm.fileExists(atPath: dir.appendingPathComponent("config.json").path),

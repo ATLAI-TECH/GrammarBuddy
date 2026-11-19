@@ -39,7 +39,6 @@ final class PanelController: NSObject, NSWindowDelegate {
     func show(outcome: ReadOutcome?, failure: ReadFailure?, operation: TextOperation, app: NSRunningApplication?, qa: Bool = false) {
         closeSilently()
         SelectionWatcher.shared.hide()
-        userResized = false
         sourceApp = app
         returnWindow = (app?.processIdentifier == NSRunningApplication.current.processIdentifier) ? NSApp.keyWindow : nil
         let m = PanelModel()
@@ -49,7 +48,12 @@ final class PanelController: NSObject, NSWindowDelegate {
         m.onReclaimKeyboard = { [weak self] in self?.reclaimKeyboard() }
         model = m
 
-        let p = GBPanel(contentRect: NSRect(x: 0, y: 0, width: 480, height: 260),
+        sizeKind = Self.kind(operation)
+        let saved = Self.savedSize(sizeKind)
+        userResized = saved != nil
+        m.panelFill = saved != nil
+        m.panelMaxContent = Self.defaults(sizeKind).maxHeight - 120
+        let p = GBPanel(contentRect: NSRect(x: 0, y: 0, width: saved?.width ?? Self.defaults(sizeKind).width, height: saved?.height ?? 260),
                         styleMask: [.nonactivatingPanel, .titled, .closable, .resizable, .fullSizeContentView],
                         backing: .buffered, defer: false)
         p.titleVisibility = .hidden
@@ -87,7 +91,8 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Below the selection when known; otherwise inside the top-right of the app's focused window (§2.2).
     private func position(_ p: NSPanel, bounds: CGRect?, window: CGRect?) {
         p.layoutIfNeeded()
-        let size = NSSize(width: 480, height: min(420, max(160, p.contentView?.fittingSize.height ?? 260)))
+        let d = Self.defaults(sizeKind)
+        let size = Self.savedSize(sizeKind) ?? NSSize(width: d.width, height: min(d.maxHeight, max(160, p.contentView?.fittingSize.height ?? 260)))
         guard let screen = NSScreen.main else { p.center(); return }
         let primaryH = NSScreen.screens.first?.frame.height ?? screen.frame.height
         var origin: NSPoint
@@ -106,21 +111,65 @@ final class PanelController: NSObject, NSWindowDelegate {
         p.setFrame(NSRect(origin: origin, size: size), display: true)
     }
 
-    /// Height follows the content up to 420 pt; the top edge stays put; a size the user dragged wins (§2.2).
+    // MARK: size
+    // Two kinds of panel with their own size: translation shows the original and the translation, so it starts wider
+    // and may grow taller than the fix / polish / tone panel. (User, 2026-11-17: "the translation box is too small, I
+    // have to resize it every time".) A size the user drags is remembered per kind and used from then on.
+
+    private var sizeKind = "edit"
     private var userResized = false
+    static func kind(_ op: TextOperation) -> String { op == .translate ? "translate" : "edit" }
+    static func defaults(_ kind: String) -> (width: CGFloat, maxHeight: CGFloat) {
+        let screenH = NSScreen.main?.visibleFrame.height ?? 800
+        return kind == "translate" ? (620, min(600, screenH - 80)) : (480, 420)
+    }
+    static func savedSize(_ kind: String) -> NSSize? {
+        guard let a = Store.defaults.array(forKey: "gb_panel_size_" + kind) as? [Double], a.count == 2, a[0] >= 420, a[1] >= 140 else { return nil }
+        let vf = NSScreen.main?.visibleFrame.size ?? NSSize(width: 1400, height: 800)
+        return NSSize(width: min(a[0], vf.width - 16), height: min(a[1], vf.height - 16))
+    }
+
+    /// Height follows the content up to the kind's maximum; the top edge stays put; a size the user dragged wins (§2.2).
     func fit() {
-        guard let p = panel, let v = p.contentView, !userResized else { return }
-        _ = v
+        guard let p = panel, let m = model else { return }
+        // the operation was switched inside the panel (⌘1…⌘4): take that kind's size
+        let k = Self.kind(m.operation)
+        if k != sizeKind {
+            sizeKind = k
+            let saved = Self.savedSize(k)
+            userResized = saved != nil
+            m.panelFill = saved != nil
+            m.panelMaxContent = Self.defaults(k).maxHeight - 120
+            var f = p.frame
+            let w = saved?.width ?? Self.defaults(k).width, h = saved?.height ?? f.height
+            f.origin.y += f.height - h
+            f.size = NSSize(width: w, height: h)
+            p.setFrame(clamped(f), display: true, animate: false)
+        }
+        guard !userResized else { return }
         let want = hosting?.sizeThatFits(in: NSSize(width: p.frame.width, height: 10000)).height ?? 260
         let titleBar = p.frame.height - p.contentLayoutRect.height   // the view ignores the safe area
-        let h = min(420, max(140, want - titleBar))
+        let h = min(Self.defaults(sizeKind).maxHeight, max(140, want - titleBar))
         guard abs(p.frame.height - h) > 2 else { return }
         var f = p.frame
         f.origin.y += f.height - h
         f.size.height = h
-        p.setFrame(f, display: true, animate: false)
+        p.setFrame(clamped(f), display: true, animate: false)
     }
-    func windowDidEndLiveResize(_ notification: Notification) { userResized = true }
+    /// Keep the whole panel on its screen (a taller panel must not run off the bottom).
+    private func clamped(_ f: NSRect) -> NSRect {
+        guard let vf = (NSScreen.screens.first { $0.frame.intersects(f) } ?? NSScreen.main)?.visibleFrame else { return f }
+        var r = f
+        r.origin.x = min(max(r.origin.x, vf.minX + 8), max(vf.minX + 8, vf.maxX - r.width - 8))
+        r.origin.y = min(max(r.origin.y, vf.minY + 8), max(vf.minY + 8, vf.maxY - r.height - 8))
+        return r
+    }
+    func windowDidEndLiveResize(_ notification: Notification) {
+        guard let p = panel else { return }
+        userResized = true
+        model?.panelFill = true
+        Store.defaults.set([Double(p.frame.width), Double(p.frame.height)], forKey: "gb_panel_size_" + sizeKind)
+    }
 
     // MARK: leave / come back (§2.2)
 

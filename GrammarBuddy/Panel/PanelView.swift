@@ -26,11 +26,13 @@ struct PanelView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentH = $0; resize($0) }
             }
-            .frame(height: min(max(contentH, 60), maxContent))
+            // a size the user chose (remembered per kind of panel) fills the window; otherwise the height follows the content
+            .frame(minHeight: m.panelFill ? 60 : nil, maxHeight: m.panelFill ? .infinity : nil)
+            .frame(height: m.panelFill ? nil : min(max(contentH, 60), m.panelMaxContent))
             Divider()
             footer
         }
-        .frame(minWidth: 480, idealWidth: 480, maxWidth: .infinity)
+        .frame(minWidth: 420, idealWidth: 480, maxWidth: .infinity)
         .background(.regularMaterial)
         .ignoresSafeArea()
         .accessibilityElement(children: .contain)
@@ -54,7 +56,7 @@ struct PanelView: View {
                     .fontWeight(m.operation == op ? .semibold : .regular)
                 }
                 .buttonStyle(.plain)
-                .help("⌘\(i + 1)")
+                .help(m.state.shortcutsOn ? "⌘\(i + 1)" : "")
                 .accessibilityLabel(OpNames.name(op) + "，⌘\(i + 1)")
                 .accessibilityAddTraits(m.operation == op ? .isSelected : [])
                 .popover(isPresented: op == .tone ? $m.showTonePicker : .constant(false)) { tonePicker }
@@ -118,7 +120,15 @@ struct PanelView: View {
             Menu(LanguageDirection.displayName(m.sourceLang)) {
                 ForEach(LanguageDirectionHelpers.choices, id: \.self) { c in Button(LanguageDirection.displayName(c)) { m.setSource(c) } }
             }.fixedSize()
-            Image(systemName: "arrow.right").foregroundStyle(.secondary)
+            Button { m.swapLanguages() } label: {
+                Image(systemName: "arrow.left.arrow.right").font(.body.weight(.semibold))
+                    .padding(.horizontal, 9).padding(.vertical, 6)
+                    .background(Color.primary.opacity(0.10), in: RoundedRectangle(cornerRadius: 7))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(L.t("换方向：\(LanguageDirection.displayName(m.targetLang)) → \(LanguageDirection.displayName(m.sourceLang))", "Swap: \(LanguageDirection.displayName(m.targetLang)) → \(LanguageDirection.displayName(m.sourceLang))"))
+            .accessibilityLabel(L.t("交换翻译方向", "Swap translation direction"))
             Menu(LanguageDirection.displayName(m.targetLang)) {
                 let mine = m.state.myLanguages
                 ForEach(mine + LanguageDirectionHelpers.choices.filter { !mine.contains($0) }, id: \.self) { c in
@@ -239,7 +249,7 @@ struct PanelView: View {
                 Button(L.t("不允许", "Don't allow")) { m.refuseAPI() }
                 if m.state.localEngine != nil { Text(L.t("（改用本机模型）", "(use the local model)")).font(.caption).foregroundStyle(.secondary) }
                 Spacer()
-                Button(L.t("只这一次（⏎）", "Just this once (⏎)")) { m.allowAPI(always: false) }.keyboardShortcut(.defaultAction)
+                Button(m.state.shortcutsOn ? L.t("只这一次（⏎）", "Just this once (⏎)") : L.t("只这一次", "Just this once")) { m.allowAPI(always: false) }.keyboardShortcut(.defaultAction)
                 Button(L.t("允许，在 \(m.appName) 里记住", "Always allow in \(m.appName)")) { m.allowAPI(always: true) }
             }
         }
@@ -294,11 +304,12 @@ struct PanelView: View {
             Label(f.message, systemImage: "exclamationmark.triangle").fixedSize(horizontal: false, vertical: true)
             HStack {
                 switch f.action {
+                case .setUpModel?: QuickStartModel(m: m)
                 case .openSettings?: Button(L.t("去设置", "Open Settings")) { AppDelegate.shared?.openSettings(tab: .ai) }
                 case .openLMStudio?:
                     Button(L.t("打开 LM Studio", "Open LM Studio")) { m.openLMStudio() }
                     Button(L.t("重试", "Retry")) { m.run() }
-                case .retry?: Button(L.t("重试（⌘R）", "Retry (⌘R)")) { m.run() }
+                case .retry?: Button(m.state.shortcutsOn ? L.t("重试（⌘R）", "Retry (⌘R)") : L.t("重试", "Retry")) { m.run() }
                 case .grantAccessibility?: Button(L.t("去授权", "Grant access")) { Permissions.openAccessibility() }
                 case .chooseEngine?: if !m.state.engines.isEmpty { Button(L.t("改用 AI 翻译", "Use AI translation")) { m.toggleTranslationEngine() } }
                 case .openAutomationSettings?: Button(L.t("打开「自动化」设置", "Open Automation settings")) { Permissions.openAutomation() }
@@ -437,13 +448,13 @@ struct PanelView: View {
             footerButton("⏎", ActionNames.name(r.enter), bold: true) { act(r.enter) }
             if r.enter != .copy { footerButton("⌘C", L.t("复制", "copy")) { act(.copy) } }
             if case .available = r.putBack, r.enter != .replace && r.enter != .trackedChange {
-                footerButton("⌘⏎", m.capture?.via == .word ? L.t("写为修订", "tracked change") : L.t("替换", "replace")) {
+                footerButton("⌘⏎", L.t("替换", "replace")) {
                     act(m.capture?.via == .word ? .trackedChange : .replace)
                 }
             }
             if r.insertBelow && r.enter != .insertBelow { footerButton("⌥⏎", L.t("插到下方", "below")) { act(.insertBelow) } }
             if case .unavailable = r.putBack {
-                Text(L.t("⌘⏎ 不可用", "⌘⏎ unavailable")).font(.caption).foregroundStyle(.tertiary).fixedSize()
+                Text(m.state.shortcutsOn ? L.t("⌘⏎ 不可用", "⌘⏎ unavailable") : L.t("这里不能替换", "Can't replace here")).font(.caption).foregroundStyle(.tertiary).fixedSize()
             }
         } else {
             footerButton("⌘R", L.t("重试", "retry")) { m.run() }.disabled(m.capture == nil)
@@ -451,7 +462,26 @@ struct PanelView: View {
         }
     }
 
+    /// With shortcuts off (the default) these are real, large buttons to click; the first one is the prominent one.
+    /// With shortcuts on they are the compact "key + word" hints.
+    @ViewBuilder
     func footerButton(_ key: String, _ title: String, bold: Bool = false, action: @escaping () -> Void) -> some View {
+        if m.state.shortcutsOn { keyHintButton(key, title, bold: bold, action: action) }
+        else {
+            Button(action: action) {
+                Text(title.prefix(1).uppercased() + title.dropFirst()).font(.body.weight(bold ? .semibold : .regular))
+                    .foregroundStyle(bold ? Color.white : Color.primary)
+                    .lineLimit(1).fixedSize()
+                    .padding(.horizontal, 14).padding(.vertical, 7)
+                    .background(bold ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color.primary.opacity(0.10)), in: RoundedRectangle(cornerRadius: 8))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(title)
+        }
+    }
+
+    func keyHintButton(_ key: String, _ title: String, bold: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Text(key).font(.caption.monospaced()).foregroundStyle(.secondary)
@@ -591,5 +621,48 @@ struct FlowLayout: Layout {
             maxX = max(maxX, x)
         }
         return (CGSize(width: min(maxX, width), height: y + lineH), pts)
+    }
+}
+
+// MARK: first use: set up the built-in model from the panel
+
+/// Shown in the panel when Fix / Polish / Tone is asked for and no model is set up. One button: use the built-in
+/// model that fits this Mac. If it is already on disk (LM Studio downloaded the same weights) it starts at once;
+/// otherwise it downloads here, with progress, and then runs.
+struct QuickStartModel: View {
+    @Bindable var m: PanelModel
+    @Bindable private var models = BuiltInModels.shared
+
+    var body: some View {
+        let c = BuiltInChoice.recommended(ramGB: m.state.ramGB)
+        VStack(alignment: .leading, spacing: 8) {
+            switch models.state(c.id) {
+            case .ready:
+                big(L.t("用内置模型 \(c.name)（已经在这台 Mac 上，不用下载）", "Use the built-in model \(c.name) (already on this Mac, no download)")) { m.useBuiltInModel(c.id) }
+            case .downloading(let f):
+                ProgressView(value: f ?? 0).frame(maxWidth: 320)
+                Text((f.map { String(format: L.t("正在下载 \(c.name)：%.0f%%", "Downloading \(c.name): %.0f%%"), $0 * 100) } ?? L.t("正在开始下载…", "Starting the download…"))
+                     + L.t("。可以关掉这个窗口，下载会继续。", ". You can close this window; the download continues."))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            case .failed(let why):
+                Text(why).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                big(L.t("再试一次下载", "Try the download again")) { m.useBuiltInModel(c.id) }
+            case .absent:
+                big(String(format: L.t("下载并使用内置模型 \(c.name)（%.1f GB，只需一次）", "Download and use the built-in model \(c.name) (%.1f GB, once)"), c.sizeGB)) { m.useBuiltInModel(c.id) }
+            }
+            Text(L.t("在 GrammarBuddy 里运行，文字不会离开这台电脑。", "Runs inside GrammarBuddy; your text never leaves this Mac."))
+                .font(.caption).foregroundStyle(.secondary)
+            Button(L.t("用别的方式（API、LM Studio、Ollama）…", "Another way (API, LM Studio, Ollama)…")) { AppDelegate.shared?.openSettings(tab: .ai) }
+                .buttonStyle(.link).font(.caption)
+        }
+    }
+
+    func big(_ title: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(.body.weight(.semibold)).foregroundStyle(.white)
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8))
+                .contentShape(Rectangle())
+        }.buttonStyle(.plain)
     }
 }

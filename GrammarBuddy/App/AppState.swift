@@ -62,6 +62,13 @@ final class AppState {
         get { access(keyPath: \.activeEngineID); return d.string(forKey: "gb_active_engine") }
         set { withMutation(keyPath: \.activeEngineID) { d.set(newValue, forKey: "gb_active_engine") } }
     }
+    /// Keyboard shortcuts are off unless switched on in Settings (user decision 2026-11-19: "too many conflicts, make
+    /// the buttons bigger and let people click"). Off: no global hotkeys, the suggestion card takes no keys, and the
+    /// panel shows buttons without key labels.
+    var shortcutsOn: Bool {
+        get { access(keyPath: \.shortcutsOn); return d.bool(forKey: "gb_shortcuts") }
+        set { withMutation(keyPath: \.shortcutsOn) { d.set(newValue, forKey: "gb_shortcuts") } }
+    }
     var activeEngine: EngineConfig? { engines.first { $0.id == activeEngineID } ?? engines.first }
     /// The engine used where text must stay on this Mac (§7.4 safeguard 3): built-in first, then Apple, LM Studio, Ollama.
     var localEngine: EngineConfig? { engines.first { $0.kind.isLocal } }
@@ -91,6 +98,18 @@ final class AppState {
     var historyEnabled: Bool {
         get { access(keyPath: \.historyEnabled); return d.object(forKey: "gb_history") as? Bool ?? true }
         set { withMutation(keyPath: \.historyEnabled) { d.set(newValue, forKey: "gb_history"); if !newValue { history.removeAll() } } }
+    }
+    /// Apps where GrammarBuddy stays out of the way: no underlines, no buttons after selecting. Switched per app from
+    /// the menu-bar menu and listed in Settings, where each can be switched back on. (User, 2026-11-19.)
+    var disabledApps: [String] {
+        get { access(keyPath: \.disabledApps); return d.stringArray(forKey: "gb_disabled_apps") ?? [] }
+        set { withMutation(keyPath: \.disabledApps) { d.set(newValue, forKey: "gb_disabled_apps") } }
+    }
+    func isDisabled(_ bundle: String?) -> Bool { bundle.map { disabledApps.contains($0) } ?? false }
+    func setDisabled(_ bundle: String, _ off: Bool) {
+        var a = disabledApps.filter { $0 != bundle }
+        if off { a.append(bundle) }
+        disabledApps = a
     }
     var neverUseClipboard: Bool {
         get { access(keyPath: \.neverUseClipboard); return d.bool(forKey: "gb_never_clipboard") }

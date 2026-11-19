@@ -87,6 +87,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: shortcuts (§2.1)
 
     func registerHotkeys() {
+        guard state.shortcutsOn else {
+            HotKeys.shared.unregisterAll()
+            state.hotkeyProblem = nil
+            updateIcon()
+            return
+        }
         let failed = HotKeys.shared.register([
             (1, HotKeys.fix, { [weak self] in self?.hotkey(.fix) }),
             (2, HotKeys.translate, { [weak self] in self?.hotkey(.translate) }),
@@ -97,7 +103,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// Shortcuts are unregistered while an excluded app (password manager) is in front (§2.1).
+    /// The last app in front that isn't GrammarBuddy: the one the menu's "turn off in …" item is about.
+    private(set) var lastOtherApp: NSRunningApplication?
+    @objc func toggleDisabledForLastApp() {
+        guard let b = lastOtherApp?.bundleIdentifier else { return }
+        state.setDisabled(b, !state.isDisabled(b))
+    }
+
     func frontAppChanged(_ app: NSRunningApplication?) {
+        if let app, app.processIdentifier != NSRunningApplication.current.processIdentifier { lastOtherApp = app }
         let excluded = AppProfiles.profile(for: app?.bundleIdentifier ?? "").excluded
         if excluded || state.hotkeysPaused { HotKeys.shared.unregisterAll() } else { registerHotkeys() }
     }
@@ -211,6 +225,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(h)
         let live = NSMenuItem(title: L.t("实时标记错误（只用本机模型）", "Live check (local model only)"), action: #selector(toggleLive), keyEquivalent: "")
         live.target = self; live.state = LiveChecker.shared.enabled ? .on : .off; menu.addItem(live)
+        // one grey line saying what live check is doing right now, or why it isn't doing anything
+        let why = NSMenuItem(title: "    " + LiveChecker.shared.diagnosis, action: nil, keyEquivalent: ""); why.isEnabled = false
+        menu.addItem(why)
+        let other = lastOtherApp ?? NSWorkspace.shared.frontmostApplication
+        if let other, let b = other.bundleIdentifier, other.processIdentifier != NSRunningApplication.current.processIdentifier,
+           !AppProfiles.profile(for: b).excluded {
+            let name = other.localizedName ?? b
+            let off = state.isDisabled(b)
+            let i = NSMenuItem(title: off ? L.t("在 \(name) 里重新启用", "Turn back on in \(name)") : L.t("在 \(name) 里停用", "Turn off in \(name)"),
+                               action: #selector(toggleDisabledForLastApp), keyEquivalent: "")
+            i.target = self; menu.addItem(i)
+        }
         let pause = NSMenuItem(title: state.hotkeysPaused ? L.t("恢复快捷键", "Resume shortcuts") : L.t("暂停快捷键", "Pause shortcuts"), action: #selector(togglePause), keyEquivalent: "")
         pause.target = self; menu.addItem(pause)
         if !state.history.isEmpty { add(menu, L.t("清空历史", "Clear history"), #selector(clearHistory)) }   // G5-14

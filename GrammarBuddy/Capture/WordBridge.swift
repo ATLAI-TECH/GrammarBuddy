@@ -111,7 +111,9 @@ enum WordBridge {
 
     struct WordWriteResult { var written: Int; var skipped: Int; var message: String; var ok: Bool }
 
-    /// Write accepted changes as tracked changes. `changes` ranges are UTF-16 offsets in `capture.text`.
+    /// Write accepted changes straight into the document (user decision 2026-11-17: no tracked changes that then have
+    /// to be accepted a second time in Word; they already chose in the panel). If the document itself has Track Changes
+    /// on, Word records them, as the document's owner asked. `changes` ranges are UTF-16 offsets in `capture.text`.
     static func writeTracked(_ changes: [Change], capture: Capture, handle: WriteHandle) async -> WordWriteResult {
         guard let info = handle.wordInfo,
               WordMap.display(info.text) == capture.leading + capture.text + capture.trailing else {
@@ -139,10 +141,20 @@ enum WordBridge {
                 info.writtenRanges = []
                 return WordWriteResult(written: 0, skipped: skippedCount, message: L.t("写入时 Word 报错：", "Word reported an error while writing: ") + e, ok: false)
             }
-            info.writtenRanges = o.edits.map { ($0.start, $0.end) }
-            var msg = L.t("已写入 \(o.edits.count) 处修订", "Wrote \(o.edits.count) tracked change(s)")
+            info.writtenRanges = o.tracked ? o.edits.map { ($0.start, $0.end) } : []
+            info.writtenPlain = []
+            if !o.tracked {
+                // EDIT k is the k-th change in document order: keep what was there, to put it back on undo
+                let ordered = todo.sorted { $0.range.location < $1.range.location }
+                for e in o.edits where e.k >= 1 && e.k <= ordered.count {
+                    let c = ordered[e.k - 1]
+                    info.writtenPlain.append((e.start, c.inserted.replacingOccurrences(of: "\n", with: "\r"), c.removed.replacingOccurrences(of: "\n", with: "\r")))
+                }
+            }
+            var msg = o.tracked ? L.t("已写入 \(o.edits.count) 处修订（这个文档开着修订）", "Wrote \(o.edits.count) tracked change(s) (Track Changes is on in this document)")
+                                : L.t("已替换 \(o.edits.count) 处", "Replaced \(o.edits.count) place(s)")
             if skippedCount > 0 { msg += L.t("，\(skippedCount) 处没有写入", "; \(skippedCount) not written") }
-            let stray = o.strayEdits
+            let stray = o.tracked ? o.strayEdits : []
             if !stray.isEmpty {
                 msg += L.t("。第 \(stray.map(String.init).joined(separator: "、")) 处和旁边的修订合并了，撤销时可能要在 Word 里手动处理",
                            ". Change(s) \(stray.map(String.init).joined(separator: ", ")) merged with a neighbouring revision; undo may need Word's Revisions pane")
@@ -154,7 +166,42 @@ enum WordBridge {
     /// Undo this write by rejecting exactly the revisions it produced (§2.8 "撤销本次修改").
     /// Uses the EDIT ranges recorded by writeTracked; `newLength` is kept for the call site and unused.
     static func rejectRevisions(capture: Capture, handle: WriteHandle, newLength: Int) async -> Bool {
-        guard let info = handle.wordInfo, !info.writtenRanges.isEmpty else { return false }
+        guard let info = handle.wordInfo else { return false }
+        if !info.writtenPlain.isEmpty {
+            // direct replacements: put the old text back, last one first, each only if the new text is still there
+            var lines = ""
+            for e in info.writtenPlain.sorted(by: { $0.start > $1.start }) {
+                let end = e.start + (e.new as NSString).length
+                lines += """
+                    set r to create range d start \(e.start) end \(end)
+                    set c to content of r
+                    if c is missing value then set c to ""
+                    if my sameText(c, "\(escape(e.new))") then
+                        set content of r to "\(escape(e.old))"
+                    else
+                        set bad to bad + 1
+                    end if
+
+                """
+            }
+            let src = """
+            on sameText(a, b)
+                considering case
+                    return a is b
+                end considering
+            end sameText
+            tell application "Microsoft Word"
+                set d to document "\(escape(info.docName))"
+                set bad to 0
+            \(lines)
+                return bad as text
+            end tell
+            """
+            info.writtenPlain = []
+            if case .success(let d) = await run(src) { return d.stringValue == "0" }
+            return false
+        }
+        guard !info.writtenRanges.isEmpty else { return false }
         let args = [info.docName] + info.writtenRanges.flatMap { [String($0.0), String($0.1)] }
         guard case .success(let out) = await runScript("reject_edits", args: args, timeout: 60) else { return false }
         let recs = WordMap.records(out)
@@ -260,6 +307,20 @@ enum WordBridge {
             default: return (false, "notfound")
             }
         }
+    }
+
+    /// The body text of the active document as Word itself has it (paragraph marks as "\r"). Used to tell words that
+    /// only Accessibility adds ("Field" before a Zotero citation) from words that are really in the document.
+    static func documentText() async -> String? {
+        let src = """
+        tell application "Microsoft Word"
+            set c to content of text object of active document
+            if c is missing value then return ""
+            return c
+        end tell
+        """
+        if case .success(let d) = await run(src) { return d.stringValue }
+        return nil
     }
 
     static let liveNotFound = L.t("在 Word 里找不到这处文字（它可能在域、脚注或表格里，或者刚被改过），没有修改",

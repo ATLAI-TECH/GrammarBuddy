@@ -27,7 +27,21 @@ struct SettingsView: View {
 
     var general: some View {
         Form {
-            Toggle(L.t("选中文字后显示「改错 / 翻译」按钮", "Show a Fix / Translate button after selecting text"), isOn: Binding(
+            if !state.disabledApps.isEmpty {
+                Section(L.t("已停用的 App", "Apps where GrammarBuddy is off")) {
+                    ForEach(state.disabledApps, id: \.self) { b in
+                        HStack {
+                            Text(NSWorkspace.shared.urlForApplication(withBundleIdentifier: b).map { FileManager.default.displayName(atPath: $0.path) } ?? b)
+                            Spacer()
+                            Button(L.t("重新启用", "Turn back on")) { state.setDisabled(b, false) }
+                        }
+                    }
+                    Text(L.t("在这些 App 里不画下划线，选中文字后也不出按钮。要停用别的 App：切到那个 App，再点菜单栏图标 →「在 … 里停用」。",
+                             "No underlines and no buttons after selecting text in these apps. To turn another app off: switch to it, then menu-bar icon → “Turn off in …”."))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Toggle(L.t("选中文字后显示「润色 | 翻译」按钮", "Show Polish and Translate buttons after selecting text"), isOn: Binding(
                 get: { SelectionWatcher.shared.enabled }, set: { SelectionWatcher.shared.enabled = $0 }))
             Text(L.t("用鼠标选中文字（拖选或双击）后，旁边出现一个小按钮，点一下开始。只在你点击后才读取和发送文字。",
                      "After you select text with the mouse (drag or double-click), a small button appears next to it; click to start. Text is read and sent only when you click."))
@@ -37,14 +51,22 @@ struct SettingsView: View {
             Text(L.t("停止输入约 1 秒后检查，点有下划线的词可以采用或忽略。只用本机模型（内置模型优先），不会把你正在写的文字自动发给任何 API。已验证：TextEdit、Word、Chrome 里的输入框。备忘录、邮件、Pages、Safari，以及 Slack、Obsidian 这类 App 按同样的办法工作，还没有逐个验证。密码框、密码管理器、终端里不会工作。",
                      "Checks about a second after you stop typing; click an underlined word to accept or ignore. Uses only a local model (built-in first) and never sends what you're writing to an API. Verified in TextEdit, Word and text areas in Chrome. Notes, Mail, Pages, Safari and apps like Slack and Obsidian work the same way but haven't each been verified. Never in password fields, password managers or terminals."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Picker(L.t("采用建议的键（卡片打开时）", "Key that accepts a suggestion (while a card is open)"), selection: Binding(
-                get: { Store.defaults.string(forKey: LiveChecker.acceptKeyKey) ?? "return" }, set: { Store.defaults.set($0, forKey: LiveChecker.acceptKeyKey) })) {
-                Text(L.t("⏎ 回车（⇥ 跳过）", "⏎ Return (⇥ skips)")).tag("return")
-                Text(L.t("⇥ Tab（→ 跳过，⏎ 留给 App）", "⇥ Tab (→ skips, ⏎ stays with the app)")).tag("tab")
+            Toggle(L.t("全局快捷键（⌃⌘G 改错、⌃⌘T 翻译、⌃⌘J 逐条过建议）", "Global shortcuts (⌃⌘G fix, ⌃⌘T translate, ⌃⌘J review suggestions)"), isOn: Binding(
+                get: { state.shortcutsOn },
+                set: { state.shortcutsOn = $0; AppDelegate.shared?.registerHotkeys() }))
+            Text(L.t("默认关闭，因为它们可能和别的 App 冲突。不受这个开关影响、一直可用的按键只有这些：建议卡片打开时 ⏎ 采用、Esc 关闭；用键盘选中文字后出现的按钮上 ⏎ 润色、⇥ 翻译、Esc 关闭；面板里 ⏎ 和 Esc。",
+                     "Off by default because they can clash with other apps. The only keys that always work: ⏎ accept and Esc close while a suggestion card is open; ⏎ Polish, ⇥ Translate and Esc on the buttons that appear after selecting text with the keyboard; ⏎ and Esc in the panel."))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if state.shortcutsOn {
+                Picker(L.t("采用建议的键（卡片打开时）", "Key that accepts a suggestion (while a card is open)"), selection: Binding(
+                    get: { Store.defaults.string(forKey: LiveChecker.acceptKeyKey) ?? "return" }, set: { Store.defaults.set($0, forKey: LiveChecker.acceptKeyKey) })) {
+                    Text(L.t("⏎ 回车（⇥ 跳过）", "⏎ Return (⇥ skips)")).tag("return")
+                    Text(L.t("⇥ Tab（→ 跳过，⏎ 留给 App）", "⇥ Tab (→ skips, ⏎ stays with the app)")).tag("tab")
+                }
+                LabeledContent(L.t("下一条建议", "Next suggestion"), value: "⌃⌘J")
+                LabeledContent(L.t("改错", "Fix"), value: "⌃⌘G")
+                LabeledContent(L.t("翻译", "Translate"), value: "⌃⌘T")
             }
-            LabeledContent(L.t("下一条建议", "Next suggestion"), value: "⌃⌘J")
-            LabeledContent(L.t("改错", "Fix"), value: "⌃⌘G")
-            LabeledContent(L.t("翻译", "Translate"), value: "⌃⌘T")
             if let p = state.hotkeyProblem { Text(p).foregroundStyle(.red) }
             Text(L.t("改快捷键的界面还没做（原型）。", "Changing shortcuts isn't built yet (prototype).")).font(.caption).foregroundStyle(.secondary)
             Picker(L.t("界面语言", "Interface language"), selection: $state.uiLanguage) {
