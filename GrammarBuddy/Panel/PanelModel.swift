@@ -48,7 +48,11 @@ final class PanelModel {
     var checks = CheckResult()
     var finish: FinishReason = .complete
     var focusedChange = -1
-    var showDiff = true
+    /// What the result area shows. Fix: every change marked in the text (each one can be switched off). Polish,
+    /// Tone and Translate: just the new text. There used to be a switch for this in the footer ("Changes | Result",
+    /// "Side by side | Translation"); the user found it and the struck-through original unnecessary (2026-11-20).
+    /// The original is still one click away under "Original (n words)".
+    var showDiff: Bool { operation == .fix }
     var showOriginal = false
     var leftPanel = false
     var confirmArmed = false
@@ -727,8 +731,10 @@ final class PanelModel {
             onClose?(); return
         }
         if cap.via == .word, let h = handle {
-            let ok = await WordBridge.insertBelow(text, handle: h)
-            note = ResultNote(text: ok ? L.t("已插入到原文下方", "Inserted below the original") : L.t("没能插入，可以复制结果", "Couldn't insert; you can copy the result"))
+            let why = await WordBridge.insertBelow(text, handle: h)
+            note = ResultNote(text: why == nil ? L.t("已插入到原文下方", "Inserted below the original")
+                                               : L.t("没能插入（Word：\(why!)）。可以复制结果", "Couldn't insert (Word: \(why!)). You can copy the result"))
+            didWrite = why == nil
             return
         }
         if let tv = handle?.inProcess, let r = cap.range {

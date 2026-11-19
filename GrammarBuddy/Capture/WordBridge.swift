@@ -326,18 +326,33 @@ enum WordBridge {
     static let liveNotFound = L.t("在 Word 里找不到这处文字（它可能在域、脚注或表格里，或者刚被改过），没有修改",
                                   "Couldn't find this text in Word (it may be inside a field, footnote or table, or was just edited); nothing was changed")
 
-    static func insertBelow(_ text: String, handle: WriteHandle) async -> Bool {
-        guard let en = handle.wordEnd else { return false }
+    /// Insert `text` as a new paragraph right after the paragraph the selection ends in. Returns nil when it worked,
+    /// otherwise what Word said.
+    ///
+    /// The paragraph's end is `end of content of text object`; the script used to ask for `end of text object`, which
+    /// Word answers with nothing, so the next line failed and every "Insert below" in Word ended in "Couldn't insert"
+    /// (user report, 2026-11-20). The variable for the insertion point was also called `ip`, which is a Word term
+    /// inside the tell block ("Can't set IP … Access not allowed"): script variables here carry a gb prefix.
+    /// The document is addressed by the name it had when it was read, not "active document".
+    static func insertBelow(_ text: String, handle: WriteHandle) async -> String? {
+        guard let en = handle.wordEnd else { return "no position" }
+        let doc = (handle.wordInfo?.docName).flatMap { $0.isEmpty ? nil : "document \"\(escape($0))\"" } ?? "active document"
+        // one "insert text" per paragraph: a string literal can't hold a paragraph mark, `return` can
+        let paras = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n").components(separatedBy: "\n")
+        let pieces = paras.map { "return & \"\(escape($0))\"" }.joined(separator: " & ")
         let src = """
         tell application "Microsoft Word"
-            set r to create range active document start \(en) end \(en)
-            set p to end of text object of (paragraph 1 of r)
-            set ip to create range active document start (p - 1) end (p - 1)
-            insert text "\r\(escape(text.replacingOccurrences(of: "\n", with: "\r")))" at ip
+            set d to \(doc)
+            set r to create range d start \(en) end \(en)
+            set gbEnd to end of content of text object of (paragraph 1 of r)
+            set gbAt to create range d start (gbEnd - 1) end (gbEnd - 1)
+            insert text (\(pieces)) at gbAt
             return "ok"
         end tell
         """
-        if case .success = await run(src) { return true }
-        return false
+        switch await run(src) {
+        case .success: return nil
+        case .failure(let e): return e.text
+        }
     }
 }

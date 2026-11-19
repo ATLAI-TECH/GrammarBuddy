@@ -415,46 +415,29 @@ struct PanelView: View {
             } else if let r = m.recommendation, let why = r.enterReason {
                 Text(why).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12).padding(.top, 6)
             }
-            // one row when it fits; otherwise counter and view switch on top, actions below (L5-05)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) { counter; Spacer(minLength: 8); actions; viewSwitch }
-                VStack(spacing: 6) {
-                    HStack { counter; Spacer(); viewSwitch }
-                    HStack(spacing: 12) { Spacer(); actions }
-                }
-            }
+            // the footer is the answer to "what now": the one main action and Copy
+            HStack(spacing: 12) { counter; Spacer(minLength: 8); actions }
             .padding(.horizontal, 12).padding(.vertical, 8)
         }
     }
 
     @ViewBuilder var counter: some View {
-        if m.phase == .done, m.operation != .translate, !m.changes.isEmpty {
+        if m.phase == .done, m.showDiff, !m.changes.isEmpty {      // only where the changes can be switched one by one
             Text(L.t("\(m.changes.count) 处 · 采用 \(m.acceptedCount)", "\(m.acceptedCount)/\(m.changes.count) accepted"))
                 .font(.caption).foregroundStyle(.secondary).lineLimit(1).fixedSize()
         }
     }
 
-    @ViewBuilder var viewSwitch: some View {
-        if m.phase == .done, m.recommendation != nil {
-            Picker("", selection: $m.showDiff) {
-                Text(m.operation == .translate ? L.t("对照", "Side by side") : L.t("差异", "Changes")).tag(true)
-                Text(m.operation == .translate ? L.t("译文", "Translation") : L.t("结果", "Result")).tag(false)
-            }.pickerStyle(.segmented).labelsHidden().fixedSize().help("⌘D")
-        }
-    }
-
     @ViewBuilder var actions: some View {
         if m.phase == .done, let r = m.recommendation {
+            // one main action (replace; "insert below" only where replacing isn't possible, e.g. a translation in
+            // Word) and Copy. The extra "Below" button is gone.
             footerButton("⏎", ActionNames.name(r.enter), bold: true) { act(r.enter) }
             if r.enter != .copy { footerButton("⌘C", L.t("复制", "copy")) { act(.copy) } }
             if case .available = r.putBack, r.enter != .replace && r.enter != .trackedChange {
                 footerButton("⌘⏎", L.t("替换", "replace")) {
                     act(m.capture?.via == .word ? .trackedChange : .replace)
                 }
-            }
-            if r.insertBelow && r.enter != .insertBelow { footerButton("⌥⏎", L.t("插到下方", "below")) { act(.insertBelow) } }
-            if case .unavailable = r.putBack {
-                Text(m.state.shortcutsOn ? L.t("⌘⏎ 不可用", "⌘⏎ unavailable") : L.t("这里不能替换", "Can't replace here")).font(.caption).foregroundStyle(.tertiary).fixedSize()
             }
         } else {
             footerButton("⌘R", L.t("重试", "retry")) { m.run() }.disabled(m.capture == nil)

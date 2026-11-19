@@ -258,7 +258,6 @@ final class PanelController: NSObject, NSWindowDelegate {
         if cmd, ["q", "w", "h"].contains(ch) { close(); return true }      // only closes the panel (§2.3)
         if cmd, let n = Int(ch), (1...4).contains(n) { m.switchOperation(TextOperation.allCases[n - 1]); return true }
         if cmd && ch == "r" { m.run(); return true }
-        if cmd && ch == "d" { m.showDiff.toggle(); return true }
         if cmd && ch == "l" && m.operation == .translate { m.showLanguageMenu.toggle(); return true }
         if code == kVK_Return || code == kVK_ANSI_KeypadEnter {
             switch m.phase {

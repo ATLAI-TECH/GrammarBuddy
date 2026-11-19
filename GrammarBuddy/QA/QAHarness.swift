@@ -795,7 +795,7 @@ final class QAHarness {
         case "allow": m.allowAPI(always: v != "once")
         case "refuse": m.refuseAPI()
         case "first": m.processFirstParagraphs(Int(v) ?? 1)
-        case "diff": m.showDiff.toggle()
+        case "diff": break        // the view switch is gone
         case "retry": m.run()
         case "polishTranslate": m.translateAndPolish()
         case "swap": m.swapLanguages()
