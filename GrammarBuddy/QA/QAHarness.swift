@@ -247,6 +247,10 @@ final class QAHarness {
                 out.append(line); from = NSMaxRange(r)
             }
             return "\n" + out.joined(separator: "\n")
+        case "update":             // "update:check" (no window) / "update:state"
+            if arg == "check" { Updater.shared.checkInBackground(); return "checking" }
+            if arg == "autodownload" { Updater.shared.automaticDownloads = true; return "on" }
+            return "\(Updater.shared.version) | \(Updater.shared.lastEvent) | canCheck=\(Updater.shared.canCheck)"
         case "wordax": return wordAX()
         case "download":           // start a real built-in model download (first-use test); "downloadstate:<id>" reports
             Task { await BuiltInModels.shared.download(arg) }

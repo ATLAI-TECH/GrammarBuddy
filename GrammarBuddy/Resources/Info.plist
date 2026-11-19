@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.1.1</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSUIElement</key>
@@ -35,5 +35,15 @@
 	<string>Copyright © 2026 AtLAI-tech. MIT License.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>GrammarBuddy connects to a model server you set up on your local network.</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/ATLAI-TECH/GrammarBuddy/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>UUOWHadrZrU3/uYt+Ymqpg2NbaZBCClUHNevEJnT2wo=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

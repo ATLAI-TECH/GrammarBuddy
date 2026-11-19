@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
         registerHotkeys()
         SelectionWatcher.shared.start()
+        Updater.shared.start()               // checks for a new version once a day
         LiveChecker.shared.start()           // underline mistakes in place (off unless enabled in Settings)      // select text → a small Fix / Translate button
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] n in
             let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
@@ -241,6 +242,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         pause.target = self; menu.addItem(pause)
         if !state.history.isEmpty { add(menu, L.t("清空历史", "Clear history"), #selector(clearHistory)) }   // G5-14
         menu.addItem(.separator())
+        let up = NSMenuItem(title: L.t("检查更新…（当前 \(Updater.shared.version)）", "Check for updates… (this is \(Updater.shared.version))"),
+                            action: #selector(Updater.checkNow), keyEquivalent: "")
+        up.target = Updater.shared; menu.addItem(up)
         add(menu, L.t("设置…", "Settings…"), #selector(openGeneralSettings), key: ",")
         add(menu, L.t("引导…", "Setup guide…"), #selector(openOnboardingAction))
         add(menu, L.t("测试窗口…", "Test window…"), #selector(openTestWindow))

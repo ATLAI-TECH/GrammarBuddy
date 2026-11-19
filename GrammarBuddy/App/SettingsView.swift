@@ -51,6 +51,18 @@ struct SettingsView: View {
             Text(L.t("停止输入约 1 秒后检查，点有下划线的词可以采用或忽略。只用本机模型（内置模型优先），不会把你正在写的文字自动发给任何 API。已验证：TextEdit、Word、Chrome 里的输入框。备忘录、邮件、Pages、Safari，以及 Slack、Obsidian 这类 App 按同样的办法工作，还没有逐个验证。密码框、密码管理器、终端里不会工作。",
                      "Checks about a second after you stop typing; click an underlined word to accept or ignore. Uses only a local model (built-in first) and never sends what you're writing to an API. Verified in TextEdit, Word and text areas in Chrome. Notes, Mail, Pages, Safari and apps like Slack and Obsidian work the same way but haven't each been verified. Never in password fields, password managers or terminals."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Toggle(L.t("自动检查更新（每天一次）", "Check for updates automatically (once a day)"), isOn: Binding(
+                get: { Updater.shared.automaticChecks }, set: { Updater.shared.automaticChecks = $0 }))
+            Toggle(L.t("有新版本时自动下载，下次退出时安装", "Download new versions automatically and install when the app quits"), isOn: Binding(
+                get: { Updater.shared.automaticDownloads }, set: { Updater.shared.automaticDownloads = $0 }))
+            HStack {
+                Text(L.t("当前版本 \(Updater.shared.version)", "This is version \(Updater.shared.version)")).foregroundStyle(.secondary)
+                Spacer()
+                Button(L.t("现在检查", "Check now")) { Updater.shared.checkNow() }
+            }
+            Text(L.t("检查更新只是从 GitHub 下载一个版本清单，不发送任何关于你或你的文字的信息。新版本安装前会用内置的公钥验证。",
+                     "Checking only downloads a version list from GitHub; nothing about you or your text is sent. A new version is verified with a built-in key before it is installed."))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Toggle(L.t("全局快捷键（⌃⌘G 改错、⌃⌘T 翻译、⌃⌘J 逐条过建议）", "Global shortcuts (⌃⌘G fix, ⌃⌘T translate, ⌃⌘J review suggestions)"), isOn: Binding(
                 get: { state.shortcutsOn },
                 set: { state.shortcutsOn = $0; AppDelegate.shared?.registerHotkeys() }))
